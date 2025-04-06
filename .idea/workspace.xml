@@ -4,27 +4,9 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="f4904cd4-1e73-4808-90e5-c91a890ae80b" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/images/Scribe.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/images/kappa架构.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/images/lambda架构.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/images/producer.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/images/rpcEnv.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/images/spark源码分析.png" afterDir="false" />
+    <list default="true" id="f4904cd4-1e73-4808-90e5-c91a890ae80b" name="Changes" comment="kafka更新">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/hi.tree" beforeDir="false" afterPath="$PROJECT_DIR$/hi.tree" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/images/kafka/Scribe.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/images/procuder.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/topics/AI.md" beforeDir="false" afterPath="$PROJECT_DIR$/topics/AI.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/topics/DDIA.md" beforeDir="false" afterPath="$PROJECT_DIR$/topics/DDIA.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/topics/Scala.md" beforeDir="false" afterPath="$PROJECT_DIR$/topics/Scala.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/topics/Spark.md" beforeDir="false" afterPath="$PROJECT_DIR$/topics/Spark.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/topics/basic.md" beforeDir="false" afterPath="$PROJECT_DIR$/topics/basic.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/topics/hadoop.md" beforeDir="false" afterPath="$PROJECT_DIR$/topics/hadoop.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/topics/kafka.md" beforeDir="false" afterPath="$PROJECT_DIR$/topics/kafka.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/topics/netty.md" beforeDir="false" afterPath="$PROJECT_DIR$/topics/netty.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/topics/redis.md" beforeDir="false" afterPath="$PROJECT_DIR$/topics/redis.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/topics/时间序列.md" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -184,11 +166,24 @@
       <workItem from="1743247205947" duration="299000" />
       <workItem from="1743593473371" duration="1211000" />
       <workItem from="1743732342622" duration="1128000" />
-      <workItem from="1743738565502" duration="44133000" />
+      <workItem from="1743738565502" duration="44883000" />
     </task>
+    <task id="LOCAL-00001" summary="kafka更新">
+      <option name="closed" value="true" />
+      <created>1743945674497</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1743945674497</updated>
+    </task>
+    <option name="localTasksCounter" value="2" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="3" />
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="kafka更新" />
+    <option name="LAST_COMMIT_MESSAGE" value="kafka更新" />
   </component>
 </project>

@@ -63,7 +63,7 @@ Lambda架构有一个显著的缺点，也就是什么事情都需要做两遍
 
 Kafka还没有成熟的时候，把数据分成批处理层和实时处理层是很难避免的。主要问题在于，我们重放实时处理层的日志是个开销很大的动作
 
-![kappa架构.png](kappa架构.png)
+![kappa架构.png](../images/kappa架构.png)
 
 相比于Lambda架构，Kappa架构去掉了Lambda 架构的批处理层，而是在**实时处理层，支持了多个视图版本**
 
@@ -258,8 +258,12 @@ public ReadyCheckResult ready(Cluster cluster, long nowMs) {
 
 **meta更新策略**
 
+当客户端中没有需要使用的元数据信息时，比如没有指定的主题信息，或者超过metadata.max.age.ms时间没有更新元数据都会引起元数据的更新操作。
+客户端参数metadata.max.age.ms的默认值为300000，即5分钟。元数据的更新操作是在客户端内部进行的，对客户端的外部使用者不可见。当需要更新元数据时，会先挑选出leastLoadedNode，然后向这个Node发送MetadataRequest请求来获取具体的元数据信息
 
-#### 网络层
+leastLoadedNode，即所有Node中负载最小的那一个，如何确定负载最小，即判断*InFlightRequests中还未确认的请求决定的，未确认的请求越多则认为负载越大*
+
+**client网络层**
 
 ![client元数据更新.png](../images/client元数据更新.png)
 
@@ -313,7 +317,7 @@ Controller在ZooKeeper的帮助下管理和协调整个Kafka
 3. 控制器故障转移（Failover）
    当运行中的控制器突然宕机或意外终止时，Kafka能够快速地感知到，并立即启用备用控制器来代替之前失败的控制器
 
-   ![](ControllerFailover.png)
+   ![](../images/ControllerFailover.png)
    
    Broker 0是控制器。当Broker 0宕机后，ZooKeeper通过Watch机制感知到并删除了/controller临时节点，然后进行重新选举
 
