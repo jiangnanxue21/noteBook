@@ -233,6 +233,7 @@ xxxxx
 > 他指的次级索引可能指的是正排和倒排
 
 - 文档的分区（document-based） 正排？
+
   ![](document-based.png)
 
 - 基于关键词（term-based）的分区 倒排？

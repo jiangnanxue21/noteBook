@@ -23,6 +23,5 @@
     <toc-element topic="spring.md"/>
     <toc-element topic="Spark.md"/>
     <toc-element topic="netty.md"/>
-    <toc-element topic="时间序列.md"/>
     <toc-element topic="一致性与共识.md"/>
 </instance-profile>

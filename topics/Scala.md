@@ -1,4 +1,4 @@
-# Scala -- 3 week
+# Scala
 ### 1. 函数和闭包
 
 调用某个函数并传入需要的参数，实际是将这个函数应用到(apply to)这些入参：
@@ -82,7 +82,7 @@ println(addMore(20))
 ```
 
 #### 柯里化
-```Java
+```Scala
 def plainOldSum(x: Int, y: Int) = x + y
 plainOldSum(1, 2)
 

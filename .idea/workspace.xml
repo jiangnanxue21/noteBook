@@ -4,37 +4,73 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="f4904cd4-1e73-4808-90e5-c91a890ae80b" name="Changes" comment="" />
+    <list default="true" id="f4904cd4-1e73-4808-90e5-c91a890ae80b" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/images/Scribe.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/images/kappa架构.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/images/lambda架构.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/images/producer.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/images/rpcEnv.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/images/spark源码分析.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/hi.tree" beforeDir="false" afterPath="$PROJECT_DIR$/hi.tree" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/images/kafka/Scribe.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/images/procuder.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/topics/AI.md" beforeDir="false" afterPath="$PROJECT_DIR$/topics/AI.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/topics/DDIA.md" beforeDir="false" afterPath="$PROJECT_DIR$/topics/DDIA.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/topics/Scala.md" beforeDir="false" afterPath="$PROJECT_DIR$/topics/Scala.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/topics/Spark.md" beforeDir="false" afterPath="$PROJECT_DIR$/topics/Spark.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/topics/basic.md" beforeDir="false" afterPath="$PROJECT_DIR$/topics/basic.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/topics/hadoop.md" beforeDir="false" afterPath="$PROJECT_DIR$/topics/hadoop.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/topics/kafka.md" beforeDir="false" afterPath="$PROJECT_DIR$/topics/kafka.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/topics/netty.md" beforeDir="false" afterPath="$PROJECT_DIR$/topics/netty.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/topics/redis.md" beforeDir="false" afterPath="$PROJECT_DIR$/topics/redis.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/topics/时间序列.md" beforeDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
     <option name="LAST_RESOLUTION" value="IGNORE" />
   </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;jiangnanxue21&quot;
+  }
+}</component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/jiangnanxue21/noteBook.git&quot;,
+    &quot;accountId&quot;: &quot;48c71fdc-4e9e-4238-9169-960fc20c2d41&quot;
+  }
+}</component>
   <component name="InstanceColorv3">
     <option name="map">
       <map>
         <entry key="$PROJECT_DIR$/hi.tree">
           <value>
             <ColorState>
-              <option name="customOrder" value="2" />
+              <option name="customOrder" value="3" />
               <option name="first">
                 <RgbState>
-                  <option name="blue" value="242" />
-                  <option name="darkBlue" value="225" />
-                  <option name="darkGreen" value="149" />
-                  <option name="darkRed" value="56" />
-                  <option name="green" value="154" />
-                  <option name="red" value="53" />
+                  <option name="blue" value="200" />
+                  <option name="darkBlue" value="147" />
+                  <option name="darkGreen" value="69" />
+                  <option name="darkRed" value="143" />
+                  <option name="green" value="60" />
+                  <option name="red" value="214" />
                 </RgbState>
               </option>
               <option name="second">
                 <RgbState>
-                  <option name="blue" value="255" />
-                  <option name="darkBlue" value="234" />
-                  <option name="darkGreen" value="197" />
-                  <option name="darkRed" value="81" />
-                  <option name="green" value="219" />
-                  <option name="red" value="87" />
+                  <option name="blue" value="185" />
+                  <option name="darkBlue" value="227" />
+                  <option name="darkGreen" value="114" />
+                  <option name="darkRed" value="181" />
+                  <option name="green" value="130" />
+                  <option name="red" value="245" />
                 </RgbState>
               </option>
             </ColorState>
@@ -50,18 +86,45 @@
                   <option name="darkBlue" value="60" />
                   <option name="darkGreen" value="68" />
                   <option name="darkRed" value="206" />
-                  <option name="green" value="61" />
-                  <option name="red" value="219" />
+                  <option name="green" value="68" />
+                  <option name="red" value="206" />
                 </RgbState>
               </option>
               <option name="second">
                 <RgbState>
-                  <option name="blue" value="66" />
+                  <option name="blue" value="65" />
                   <option name="darkBlue" value="65" />
                   <option name="darkGreen" value="126" />
                   <option name="darkRed" value="231" />
-                  <option name="green" value="142" />
-                  <option name="red" value="255" />
+                  <option name="green" value="126" />
+                  <option name="red" value="231" />
+                </RgbState>
+              </option>
+            </ColorState>
+          </value>
+        </entry>
+        <entry key="$PROJECT_DIR$/hi.tree">
+          <value>
+            <ColorState>
+              <option name="customOrder" value="2" />
+              <option name="first">
+                <RgbState>
+                  <option name="blue" value="225" />
+                  <option name="darkBlue" value="225" />
+                  <option name="darkGreen" value="149" />
+                  <option name="darkRed" value="56" />
+                  <option name="green" value="149" />
+                  <option name="red" value="56" />
+                </RgbState>
+              </option>
+              <option name="second">
+                <RgbState>
+                  <option name="blue" value="234" />
+                  <option name="darkBlue" value="234" />
+                  <option name="darkGreen" value="197" />
+                  <option name="darkRed" value="81" />
+                  <option name="green" value="197" />
+                  <option name="red" value="81" />
                 </RgbState>
               </option>
             </ColorState>
@@ -73,26 +136,34 @@
   <component name="ProjectCodeStyleSettingsMigration">
     <option name="version" value="2" />
   </component>
-  <component name="ProjectColorInfo"><![CDATA[{
-  "associatedIndex": 3
-}]]></component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 3
+}</component>
   <component name="ProjectId" id="2ucy9j4rW82EFVFvOcZ5S8o2v57" />
+  <component name="ProjectLevelVcsManager" settingsEditedManually="true" />
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "kotlin-language-version-configured": "true",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
+    &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
-}]]></component>
+}</component>
+  <component name="RecentsManager">
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="D:\source code\Writerside\images" />
+    </key>
+  </component>
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
@@ -109,7 +180,11 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1742562010306</updated>
-      <workItem from="1742562011248" duration="1850000" />
+      <workItem from="1742562011248" duration="2410000" />
+      <workItem from="1743247205947" duration="299000" />
+      <workItem from="1743593473371" duration="1211000" />
+      <workItem from="1743732342622" duration="1128000" />
+      <workItem from="1743738565502" duration="44133000" />
     </task>
     <servers />
   </component>

@@ -909,7 +909,6 @@ private static class IntegerCache {
 
 所以，对于i1 == i2，会从IntegerCache取值，拿到相同的值，而i3 == i4会创建新的值
 
-
 ## 3. JVM
 
 ### 双亲委派
@@ -992,7 +991,4 @@ private static class IntegerCache {
 9. 为什么TOMCAT要破坏双亲委派？ 1
 10. 谈谈你对模块化技术的理解吧
 
-## 字节码
-
-- 类文件结构有几个部分
-- 知道字节码吗？字节码都有哪些？Integer x = 5; int y = 5; 比较x == y 都经过哪些步骤
+## 4. DDD

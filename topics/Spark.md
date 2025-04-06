@@ -2,7 +2,9 @@
 
 ![spark架构.png](spark架构.png)
 
-## 原始论文（Resilient Distributed Datasets: A Fault-Tolerant Abstraction for In-Memory Cluster Computing）
+## 1. 论文
+
+Resilient Distributed Datasets: A Fault-Tolerant Abstraction for In-Memory Cluster Computing
 
 计算模型：
 
@@ -60,7 +62,7 @@ Internally, each RDD is characterized by five main properties:
 
    partitions和splits一个意思, 读取文件，假如文件有十个块，fileRDD则有十个分区
     ```Scala
-     val fileRDD: RDD[String] = sc.textFile(...)
+     val fileRDD: RDD[String] = sc.textFile("...")
     ```
 2. A function for computing each split
 
@@ -91,7 +93,9 @@ Internally, each RDD is characterized by five main properties:
 论文里提到，除了对 RDD 持久化之外，我们还可以自己定义 RDD 如何进行分区，并且提到了可以对存储优化有用，比如把两个需要 Join
 操作的数据集进行相同的哈希分区。那么，为什么这么做会对存储优化有用呢？它在应用层面到底优化了什么？
 
-## 术语
+## 2. 基础知识
+
+### 2.1 基本术语
 
 ![术语.png](术语.png)
 
@@ -156,9 +160,11 @@ object WordCountScala {
 ![sparkJob.png](sparkJob.png)
 
 stage和stage中间是shuffle
+
 ![sparkDetailJob.png](sparkDetailJob.png)
 
 为什么是灰色还有skipped？RDD数据集复用
+
 ![sparkJob1.png](sparkJob1.png)
 
 ## wordCount源码分析
@@ -178,7 +184,7 @@ reduce.foreach(println)
 
 ```Scala
 val fileRDD: RDD[String] = sc.textFile("...")
-```
+``` 
 
 ```Scala
 // minPartitions: 和path块比较的最大值
@@ -199,8 +205,7 @@ def hadoopFile[K, V](
     minPartitions: Int = defaultMinPartitions): RDD[(K, V)] = withScope {
   assertNotStopped()
 
-  ..........
-  new HadoopRDD(....).setName(path)
+  new HadoopRDD().setName(path)
 }
 
 class HadoopRDD[K, V](
@@ -218,18 +223,20 @@ class HadoopRDD[K, V](
     @transient private var _sc: SparkContext,
     @transient private var deps: Seq[Dependency[_]]
   ) extends Serializable with Logging {
-
+ 
+ }
 ```
 
 接下去看HadoopRDD是如何计算切片的, RDD.scala#getPartitions
 
 ```Scala
   override def getPartitions: Array[Partition] = {
-    val jobConf = getJobConf()
-    // add the credentials here as this can be called before SparkContext initialized
-    SparkHadoopUtil.get.addCredentials(jobConf)
-    // 重要：面向文件操作的时候，Partition其实和切片是一个概念
-    val allInputSplits = getInputFormat(jobConf).getSplits(jobConf, minPartitions)
+  val jobConf = getJobConf()
+  // add the credentials here as this can be called before SparkContext initialized
+  SparkHadoopUtil.get.addCredentials(jobConf)
+  // 重要：面向文件操作的时候，Partition其实和切片是一个概念
+  val allInputSplits = getInputFormat(jobConf).getSplits(jobConf, minPartitions)
+}
 ```
 
 compute函数对应的是RDD中第二个特性，A function for computing each split
@@ -239,15 +246,13 @@ compute函数对应的是RDD中第二个特性，A function for computing each s
 ```Scala
   override def compute(theSplit: Partition, context: TaskContext): InterruptibleIterator[(K, V)] = {
     val iter = new NextIterator[(K, V)] {
-
-      ......
+      
     }
     new InterruptibleIterator[(K, V)](context, iter)
   }
 ```
 
 第二行代码分析：
-
 ```Scala
 val words: RDD[String] = fileRDD.flatMap((x:String)=>{x.split(" ")})
 ```
@@ -262,7 +267,6 @@ def flatMap[U: ClassTag](f: T => TraversableOnce[U]): RDD[U] = withScope {
 ```
 
 MapPartitionsRDD
-
 ```Scala
 private[spark] class MapPartitionsRDD[U: ClassTag, T: ClassTag](
     var prev: RDD[T],
@@ -270,17 +274,16 @@ private[spark] class MapPartitionsRDD[U: ClassTag, T: ClassTag](
     preservesPartitioning: Boolean = false,
     isOrderSensitive: Boolean = false)
   extends RDD[U](prev) {
-  
-  .....
+
   // RDD[U](prev)
   def this(@transient oneParent: RDD[_]) =
     // oneParent.context: 上一个RDD的上下文
     // OneToOneDependency: 1:1对应关系
     this(oneParent.context, List(new OneToOneDependency(oneParent)))
+}
 ```
 
 主要看compute#MapPartitionsRDD是如何操作的
-
 ```Scala
  override def compute(split: Partition, context: TaskContext): Iterator[U] =
  // firstParent.iterator(..): 是前一个RDD方法的迭代器，iterator是父类RDD的方法
@@ -288,7 +291,6 @@ private[spark] class MapPartitionsRDD[U: ClassTag, T: ClassTag](
 ```
 
 如果外界调用iterator缓存，持久化找不到的话，会调用自己的compute方法
-
 ```Scala
   // iterator#RDD, computeOrReadCheckpoint#RDD
   /**
@@ -319,7 +321,6 @@ private[spark] class MapPartitionsRDD[U: ClassTag, T: ClassTag](
 ```
 
 第三行代码分析:
-
 ```Scala
 // reduceByKey: 关注的同一个key下的一组数据
 val res: RDD[(String, Int)] = pairWord.reduceByKey((x: Int, y: Int) => {
@@ -358,7 +359,6 @@ def defaultPartitioner(rdd: RDD[_], others: RDD[_]*): Partitioner = {
 combiner函数是用于压缩，减少IO的，比如(k, 1), (k, 1), (k, 1), (k, 1) => (k, 4)
 
 spark不用自己写combiner函数，combineByKeyWithClassTag函数已经底层优化
-
 ```Scala
   /**
    * Merge the values for each key using an associative and commutative reduce function. This will
@@ -409,13 +409,12 @@ spark不用自己写combiner函数，combineByKeyWithClassTag函数已经底层�
 ```
 
 HadoopRDD，MapPartitionsRDD不需要其他数据的参与，而ShuffledRDD是拿前面的RDD计算形成的文件，所以不需要前面的RDD的序列化，不然会重复计算
-
 ```Scala
   class ShuffledRDD[K: ClassTag, V: ClassTag, C: ClassTag](
     // @transient: 不序列化
     @transient var prev: RDD[_ <: Product2[K, V]],
     part: Partitioner)
-  extends RDD[(K, C)](prev.context, Nil) {
+  extends RDD[(K, C)](prev.context, Nil) {}
 ```
 
 ShuffledRDD传入的deps是Nil，会由getDependencies#ShuffledRDD重写
@@ -454,28 +453,29 @@ ShuffledRDD的compute没有和之前的RDD一样调父类的迭代器
 ShuffleMapTask的write和read方法
 ```Scala
   override def runTask(context: TaskContext): MapStatus = {
-    // Deserialize the RDD using the broadcast variable.
-    val threadMXBean = ManagementFactory.getThreadMXBean
-    val deserializeStartTime = System.currentTimeMillis()
-    val deserializeStartCpuTime = if (threadMXBean.isCurrentThreadCpuTimeSupported) {
-      threadMXBean.getCurrentThreadCpuTime
-    } else 0L
-    val ser = SparkEnv.get.closureSerializer.newInstance()
-    val (rdd, dep) = ser.deserialize[(RDD[_], ShuffleDependency[_, _, _])](
-      ByteBuffer.wrap(taskBinary.value), Thread.currentThread.getContextClassLoader)
-    _executorDeserializeTime = System.currentTimeMillis() - deserializeStartTime
-    _executorDeserializeCpuTime = if (threadMXBean.isCurrentThreadCpuTimeSupported) {
-      threadMXBean.getCurrentThreadCpuTime - deserializeStartCpuTime
-    } else 0L
+  // Deserialize the RDD using the broadcast variable.
+  val threadMXBean = ManagementFactory.getThreadMXBean
+  val deserializeStartTime = System.currentTimeMillis()
+  val deserializeStartCpuTime = if (threadMXBean.isCurrentThreadCpuTimeSupported) {
+    threadMXBean.getCurrentThreadCpuTime
+  } else 0L
+  val ser = SparkEnv.get.closureSerializer.newInstance()
+  val (rdd, dep) = ser.deserialize[(RDD[_], ShuffleDependency[_, _, _])](
+    ByteBuffer.wrap(taskBinary.value), Thread.currentThread.getContextClassLoader)
+  _executorDeserializeTime = System.currentTimeMillis() - deserializeStartTime
+  _executorDeserializeCpuTime = if (threadMXBean.isCurrentThreadCpuTimeSupported) {
+    threadMXBean.getCurrentThreadCpuTime - deserializeStartCpuTime
+  } else 0L
 
-    var writer: ShuffleWriter[Any, Any] = null
-    try {
-      val manager = SparkEnv.get.shuffleManager
-      writer = manager.getWriter[Any, Any](dep.shuffleHandle, partitionId, context)
-      // 这个是最后一个rdd
-      writer.write(rdd.iterator(partition, context).asInstanceOf[Iterator[_ <: Product2[Any, Any]]])
-      writer.stop(success = true).get
-    }
+  var writer: ShuffleWriter[Any, Any] = null
+  try {
+    val manager = SparkEnv.get.shuffleManager
+    writer = manager.getWriter[Any, Any](dep.shuffleHandle, partitionId, context)
+    // 这个是最后一个rdd
+    writer.write(rdd.iterator(partition, context).asInstanceOf[Iterator[_ <: Product2[Any, Any]]])
+    writer.stop(success = true).get
+  }
+}
 ```
 
 第四行代码分析：
@@ -490,11 +490,13 @@ ShuffleMapTask的write和read方法
 ```
 
 RDD的类型如下：
+
 ![RDD类型.png](RDD类型.png)
 
 RDD的依赖关系如下：
 
 其中NarrowDependency的关系是1:1或者是n:1的
+
 ![RDD依赖关系.png](RDD依赖关系.png)
 
 ## Spark算子
@@ -581,6 +583,7 @@ Spark算子在有些情况下使用会有问题，比如mapPartitionsWithIndex�
 ```
 
 这个问题在哪里呢？假如数据是1T，内存只有10G，则每条数据都会先放入ListBuffer，导致内存溢出
+
 ![spark外联sql_v2.png](spark外联sql_v2.png)
 
 版本2：构造自己的一个迭代器
@@ -609,7 +612,6 @@ val res03: RDD[String] = data.mapPartitionsWithIndex(
 #### 分区优化
 
 repartition是通过shuffle将数据进行重分区，那如何选择分区数 // todo
-
 ```Scala
  val repartition: RDD[(Int, Int)] = data1.coalesce(3, shuffle = false)
  val res: RDD[(Int, (Int, Int))] = repartition.mapPartitionsWithIndex(
@@ -631,11 +633,12 @@ repartition是通过shuffle将数据进行重分区，那如何选择分区数 /
 如何理解data1.coalesce(3, shuffle = false)是窄依赖呢？
 
 如下图所示，RDD1中的P1和P2会结合向RDD2中的P1移动，即所谓的IO移动
-![coalesce.png](coalesce.png)
+
+![coalesce.png](../images/coalesce.png)
 
 ## 集群架构
 
-![spark集群架构.png](spark集群架构.png)
+![spark集群架构.png](../images/spark集群架构.png)
 
 架构分为三层，分别是：资源层、计算层和存储层
 
@@ -660,12 +663,19 @@ ApplicationMaster：归属于yarn，等于说是yarn暴露出来的一个接口�
 
 2. 官网的cluster mode
 
-![cluster_mode.png](cluster_mode.png)
+![cluster_mode.png](../images/cluster_mode.png)
 
 存储层可以是hdfs或者Spark具备计算程序启动后，为自己维护一个分布式存储系统
 
+## 4. 源码部分
 
-### RpcEnv
+主要是看资源层和计算层
+
+![spark源码分析.png](../images/spark源码分析.png)
+
+![rpcEnv.png](../images/rpcEnv.png)
+
+### 4.1 RpcEnv
 
 启动spark,调用的是start-all.sh
 
