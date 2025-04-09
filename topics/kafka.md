@@ -263,6 +263,8 @@ public ReadyCheckResult ready(Cluster cluster, long nowMs) {
 
 leastLoadedNode，即所有Node中负载最小的那一个，如何确定负载最小，即判断*InFlightRequests中还未确认的请求决定的，未确认的请求越多则认为负载越大*
 
+
+
 **client网络层**
 
 ![client元数据更新.png](../images/client元数据更新.png)
@@ -274,6 +276,19 @@ wakeup()方法用于唤醒在select()或select(long)方法调用中被阻塞的�
 多路复用器获取的是**事件**而不是读取数据
 
 写事件不需要注册，数据准备好之后，再注册写事件，wakeup马上发送数据
+
+
+https://www.cnblogs.com/longfurcat/p/18664750
+
+https://blog.csdn.net/qq_33204709/article/details/137098027
+
+*如何处理粘包和拆包？*
+- 粘包
+
+- 拆包
+
+Java生产者是如何管理TCP连接的？
+
 
 #### 应用
 

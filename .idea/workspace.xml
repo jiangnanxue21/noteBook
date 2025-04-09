@@ -6,7 +6,6 @@
   <component name="ChangeListManager">
     <list default="true" id="f4904cd4-1e73-4808-90e5-c91a890ae80b" name="Changes" comment="kafka更新">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/topics/kafka.md" beforeDir="false" afterPath="$PROJECT_DIR$/topics/kafka.md" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -127,20 +126,39 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
-    &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
-    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
-    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
-    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
-    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
-    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
-    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "git-widget-placeholder": "master",
+    "kotlin-language-version-configured": "true",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "vue.rearranger.settings.migration": "true"
+  },
+  "keyToStringList": {
+    "stardust.markdown.MarkdownSplitEditorSuppressor:keyList": [
+      "D:/source code/Writerside/topics/AI.md",
+      "D:/source code/Writerside/topics/DDIA.md",
+      "D:/source code/Writerside/topics/HBase.md",
+      "D:/source code/Writerside/topics/Introduction.md",
+      "D:/source code/Writerside/topics/JUC.md",
+      "D:/source code/Writerside/topics/Scala.md",
+      "D:/source code/Writerside/topics/Spark.md",
+      "D:/source code/Writerside/topics/basic.md",
+      "D:/source code/Writerside/topics/elasticsearch.md",
+      "D:/source code/Writerside/topics/hadoop.md",
+      "D:/source code/Writerside/topics/kafka.md",
+      "D:/source code/Writerside/topics/netty.md",
+      "D:/source code/Writerside/topics/redis.md",
+      "D:/source code/Writerside/topics/spring.md",
+      "D:/source code/Writerside/topics/分布式.md"
+    ]
   }
-}</component>
+}]]></component>
   <component name="RecentsManager">
     <key name="MoveFile.RECENT_KEYS">
       <recent name="D:\source code\Writerside\images" />
@@ -166,7 +184,7 @@
       <workItem from="1743247205947" duration="299000" />
       <workItem from="1743593473371" duration="1211000" />
       <workItem from="1743732342622" duration="1128000" />
-      <workItem from="1743738565502" duration="44883000" />
+      <workItem from="1743738565502" duration="46257000" />
     </task>
     <task id="LOCAL-00001" summary="kafka更新">
       <option name="closed" value="true" />
@@ -176,7 +194,15 @@
       <option name="project" value="LOCAL" />
       <updated>1743945674497</updated>
     </task>
-    <option name="localTasksCounter" value="2" />
+    <task id="LOCAL-00002" summary="kafka更新">
+      <option name="closed" value="true" />
+      <created>1743946385598</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1743946385598</updated>
+    </task>
+    <option name="localTasksCounter" value="3" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
