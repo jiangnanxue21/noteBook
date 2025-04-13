@@ -311,3 +311,269 @@ back test
 data leak: 你的模型在无意间已经拿到了验证集的信息, 交叉验证
 
 ### 时间序列的评估
+
+##  Prompt Engineering
+
+### Prompting Principles
+- **Principle 1: Write clear and specific instructions**
+- **Principle 2: Give the model time to “think”**
+
+### Tactics
+
+#### Tactic 1: Use delimiters to clearly indicate distinct parts of the input
+- Delimiters can be anything like: ```, """, < >, `<tag> </tag>`, `:`
+
+使用```将文本隔开：
+```Python
+text = f"""
+You should express what you want a model to do by \ 
+providing instructions that are as clear and \ 
+specific as you can possibly make them. \ 
+This will guide the model towards the desired output, \ 
+and reduce the chances of receiving irrelevant \ 
+or incorrect responses. Don't confuse writing a \ 
+clear prompt with writing a short prompt. \ 
+In many cases, longer prompts provide more clarity \ 
+and context for the model, which can lead to \ 
+more detailed and relevant outputs.
+"""
+prompt = f"""
+Summarize the text delimited by triple backticks \ 
+into a single sentence.
+```{text}```
+"""
+response = get_completion(prompt)
+print(response)
+```
+
+#### Tactic 2: Ask for a structured output
+- JSON, HTML
+
+```Python
+prompt = f"""
+Generate a list of three made-up book titles along \ 
+with their authors and genres. 
+Provide them in JSON format with the following keys: 
+book_id, title, author, genre.
+"""
+response = get_completion(prompt)
+print(response)
+```
+
+#### Tactic 3: Ask the model to check whether conditions are satisfied
+
+并且需要给出不满足条件的情况下如何做
+
+```Python
+text_2 = f"""
+The sun is shining brightly today, and the birds are \
+singing. It's a beautiful day to go for a \ 
+walk in the park. The flowers are blooming, and the \ 
+trees are swaying gently in the breeze. People \ 
+are out and about, enjoying the lovely weather. \ 
+Some are having picnics, while others are playing \ 
+games or simply relaxing on the grass. It's a \ 
+perfect day to spend time outdoors and appreciate the \ 
+beauty of nature.
+"""
+prompt = f"""
+You will be provided with text delimited by triple quotes. 
+If it contains a sequence of instructions, \ 
+re-write those instructions in the following format:
+
+Step 1 - ...
+Step 2 - …
+…
+Step N - …
+
+If the text does not contain a sequence of instructions, \ 
+then simply write \"No steps provided.\"
+
+\"\"\"{text_2}\"\"\"
+"""
+response = get_completion(prompt)
+print("Completion for Text 2:")
+print(response)
+```
+
+他会告诉你不满足条件
+```Text
+Completion for Text 2:
+No steps provided.
+```
+
+如果把下面删除
+```Text
+If the text does not contain a sequence of instructions, \ 
+then simply write \"No steps provided.\"
+```
+
+则会给出错误的答案
+```Text
+Completion for Text 2:
+Step 1 - Go for a walk in the park.
+Step 2 - Enjoy the blooming flowers and swaying trees.
+Step 3 - See people out and about, having picnics, playing games, or relaxing on the grass.
+Step 4 - Spend time outdoors and appreciate the beauty of nature.
+```
+
+#### Tactic 4: "Few-shot" prompting
+
+少样本提示: providing examples of successful executions of the task you want performed before asking the model to do the actually task
+
+```Python
+prompt = f"""
+Your task is to answer in a consistent style.
+
+<child>: Teach me about patience.
+
+<grandparent>: The river that carves the deepest \ 
+valley flows from a modest spring; the \ 
+grandest symphony originates from a single note; \ 
+the most intricate tapestry begins with a solitary thread.
+
+<child>: Teach me about resilience.
+"""
+response = get_completion(prompt)
+print(response)
+```
+
+### Principle 2: Give the model time to “think”
+
+#### Tactic 1: Specify the steps required to complete a task
+
+我的理解是指定步骤，让他更多的思考
+```Python
+text = f"""
+In a charming village, siblings Jack and Jill set out on \ 
+a quest to fetch water from a hilltop \ 
+well. As they climbed, singing joyfully, misfortune \ 
+struck—Jack tripped on a stone and tumbled \ 
+down the hill, with Jill following suit. \ 
+Though slightly battered, the pair returned home to \ 
+comforting embraces. Despite the mishap, \ 
+their adventurous spirits remained undimmed, and they \ 
+continued exploring with delight.
+"""
+# example 1
+prompt_1 = f"""
+Perform the following actions: 
+1 - Summarize the following text delimited by triple \
+backticks with 1 sentence.
+2 - Translate the summary into French.
+3 - List each name in the French summary.
+4 - Output a json object that contains the following \
+keys: french_summary, num_names.
+
+Separate your answers with line breaks.
+
+Text:
+```{text}```
+"""
+response = get_completion(prompt_1)
+print("Completion for prompt 1:")
+print(response)
+```
+
+#### Tactic 2: Instruct the model to work out its own solution before rushing to a conclusion
+
+```Python
+prompt = f"""
+Determine if the student's solution is correct or not.
+
+Question:
+I'm building a solar power installation and I need \
+ help working out the financials. 
+- Land costs $100 / square foot
+- I can buy solar panels for $250 / square foot
+- I negotiated a contract for maintenance that will cost \ 
+me a flat $100k per year, and an additional $10 / square \
+foot
+What is the total cost for the first year of operations 
+as a function of the number of square feet.
+
+Student's Solution:
+Let x be the size of the installation in square feet.
+Costs:
+1. Land cost: 100x
+2. Solar panel cost: 250x
+3. Maintenance cost: 100,000 + 100x
+Total cost: 100x + 250x + 100,000 + 100x = 450x + 100,000
+"""
+response = get_completion(prompt)
+print(response)
+```
+
+如果直接问答案是否正确可能会给出错误的答案。
+
+**Note that the student's solution is actually not correct.**
+**We can fix this by instructing the model to work out its own solution first.**
+
+让他自己做一遍，在和学生的答案比对
+
+```Python
+prompt = f"""
+Your task is to determine if the student's solution \
+is correct or not.
+To solve the problem do the following:
+- First, work out your own solution to the problem including the final total. 
+- Then compare your solution to the student's solution \ 
+and evaluate if the student's solution is correct or not. 
+Don't decide if the student's solution is correct until 
+you have done the problem yourself.
+
+Use the following format:
+Question:
+```
+question here
+```
+Student's solution:
+```
+student's solution here
+```
+Actual solution:
+```
+steps to work out the solution and your solution here
+```
+Is the student's solution the same as actual solution \
+just calculated:
+```
+yes or no
+```
+Student grade:
+```
+correct or incorrect
+```
+
+Question:
+```
+I'm building a solar power installation and I need help \
+working out the financials.
+- Land costs $100 / square foot
+- I can buy solar panels for $250 / square foot
+- I negotiated a contract for maintenance that will cost \
+  me a flat $100k per year, and an additional $10 / square \
+  foot
+  What is the total cost for the first year of operations \
+  as a function of the number of square feet.
+``` 
+Student's solution:
+```
+Let x be the size of the installation in square feet.
+Costs:
+1. Land cost: 100x
+2. Solar panel cost: 250x
+3. Maintenance cost: 100,000 + 100x
+   Total cost: 100x + 250x + 100,000 + 100x = 450x + 100,000
+```
+Actual solution:
+"""
+response = get_completion(prompt)
+print(response)
+```
+
+#### Model Limitations: Hallucinations
+- Boie is a real company, the product name is not real.
+- Reducing hallucinations:
+
+  First find relevant information, then answer the question based on the relevant information.

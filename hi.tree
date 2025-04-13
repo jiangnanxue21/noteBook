@@ -7,6 +7,7 @@
                   start-page="Introduction.md">
 
     <toc-element topic="DDIA.md"/>
+    <toc-element topic="GraphRag.md"/>
     <toc-element topic="Introduction.md"/>
     <toc-element topic="JUC.md"/>
     <toc-element topic="Scala.md"/>

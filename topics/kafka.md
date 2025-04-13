@@ -258,12 +258,16 @@ public ReadyCheckResult ready(Cluster cluster, long nowMs) {
 
 **meta更新策略**
 
-当客户端中没有需要使用的元数据信息时，比如没有指定的主题信息，或者超过metadata.max.age.ms时间没有更新元数据都会引起元数据的更新操作。
+当客户端中没有需要使用的元数据信息时，比如没有指定的主题信息，或者超过metadata.max.age.ms时间没有更新元数据都会引起元数据的更新操作
+
 客户端参数metadata.max.age.ms的默认值为300000，即5分钟。元数据的更新操作是在客户端内部进行的，对客户端的外部使用者不可见。当需要更新元数据时，会先挑选出leastLoadedNode，然后向这个Node发送MetadataRequest请求来获取具体的元数据信息
 
 leastLoadedNode，即所有Node中负载最小的那一个，如何确定负载最小，即判断*InFlightRequests中还未确认的请求决定的，未确认的请求越多则认为负载越大*
 
-
+疑问？ 
+1. 如果配了多个nodes，会和每个node建立连接然后再取消吗？
+2. 当元数据得不到更新，发送到消息到错的leader咋没处理？
+3. 负载最小的那一个是如何找的？
 
 **client网络层**
 
@@ -273,22 +277,17 @@ wakeup()方法用于唤醒在select()或select(long)方法调用中被阻塞的�
 
 ![wakeup.png](../images/wakeup.png)
 
-多路复用器获取的是**事件**而不是读取数据
+多路复用器获取的是**事件**而不是读取数据, read的情况下首先产生的是事件，然后selector再处理
 
-写事件不需要注册，数据准备好之后，再注册写事件，wakeup马上发送数据
-
+写事件不需要注册，依赖send-queue ， 数据准备好之后，再注册写事件，wakeup马上发送数据 --- 这个再看下
 
 https://www.cnblogs.com/longfurcat/p/18664750
 
 https://blog.csdn.net/qq_33204709/article/details/137098027
 
-*如何处理粘包和拆包？*
-- 粘包
+- 处理粘包和拆包？
 
-- 拆包
-
-Java生产者是如何管理TCP连接的？
-
+- Java生产者是如何管理TCP连接的？
 
 #### 应用
 
@@ -310,6 +309,148 @@ Java生产者是如何管理TCP连接的？
       - 设置replication.factor>= 3，目前防止消息丢失的主要机制就是冗余
       - unclean.leader.election.enable=false。控制哪些Broker有资格竞选分区的Leader。不允许一个Broker落后原先的Leader太多当Leader，
 
+
+### Server请求处理模块
+
+整体架构:
+
+![SocketServer.png](SocketServer.png)
+
+KafkaServer.startup()构造方法的初始化各个组件
+```Scala
+socketServer = new SocketServer(config, metrics, time, credentialProvider, apiVersionManager)
+// 开始连接和处理线程
+socketServer.startup(startProcessingRequests = false)
+
+val dataPlaneRequestChannel = new RequestChannel(maxQueuedRequests, DataPlaneMetricPrefix, time, apiVersionManager.newRequestMetrics)
+
+dataPlaneRequestProcessor = new KafkaApis(socketServer.dataPlaneRequestChannel, zkSupport, replicaManager, groupCoordinator, transactionCoordinator,
+    autoTopicCreationManager, config.brokerId, config, configRepository, metadataCache, metrics, authorizer, quotaManagers,
+    fetchManager, brokerTopicStats, clusterId, time, tokenManager, apiVersionManager)
+
+// 处理线程池
+dataPlaneRequestHandlerPool = new KafkaRequestHandlerPool(config.brokerId, socketServer.dataPlaneRequestChannel, dataPlaneRequestProcessor, time,
+    config.numIoThreads, s"${SocketServer.DataPlaneMetricPrefix}RequestHandlerAvgIdlePercent", SocketServer.DataPlaneThreadPrefix)
+
+```
+
+dataPlaneRequestChannel，就是传输Request/Response的通道
+
+就RequestChannel类本身的主体功能而言，它定义了最核心的 3 个属性：requestQueue、queueSize 和 processors
+
+
+
+服务端如何管理这么多的连接，完成请求和响应的正确匹配
+
+接受的message如何保证顺序处理
+
+RequestChannel, KafkaApis, KafkaRequestHandlerPool三者的关系
+
+
+```Scala
+// SocketServer.scala
+private val dataPlaneProcessors = new ConcurrentHashMap[Int, Processor]()
+private[network] val dataPlaneAcceptors = new ConcurrentHashMap[EndPoint, Acceptor]()
+val dataPlaneRequestChannel = new RequestChannel(maxQueuedRequests, DataPlaneMetricPrefix, time, apiVersionManager.newRequestMetrics)
+
+def startup(startProcessingRequests: Boolean = true,
+            controlPlaneListener: Option[EndPoint] = config.controlPlaneListener,
+            dataPlaneListeners: Seq[EndPoint] = config.dataPlaneListeners): Unit = {
+  this.synchronized {
+    createControlPlaneAcceptorAndProcessor(controlPlaneListener)
+    createDataPlaneAcceptorsAndProcessors(config.numNetworkThreads, dataPlaneListeners)
+    if (startProcessingRequests) {
+      this.startProcessingRequests()
+    }
+  }
+}
+
+// endpoints是ip+port，每一个都会新建一个Acceptor
+private def createDataPlaneAcceptorsAndProcessors(dataProcessorsPerListener: Int,
+                                                  endpoints: Seq[EndPoint]): Unit = {
+   endpoints.foreach { endpoint =>
+      connectionQuotas.addListener(config, endpoint.listenerName)
+      val dataPlaneAcceptor = createAcceptor(endpoint, DataPlaneMetricPrefix)
+      
+      // 处理Processor
+      addDataPlaneProcessors(dataPlaneAcceptor, endpoint, dataProcessorsPerListener)
+      dataPlaneAcceptors.put(endpoint, dataPlaneAcceptor)
+      info(s"Created data-plane acceptor and processors for endpoint : ${endpoint.listenerName}")
+   }
+}
+```
+Acceptor即NIO模型中处理连接部分
+
+
+```Scala
+class RequestChannel(val queueSize: Int,
+                     val metricNamePrefix: String,
+                     time: Time,
+                     val metrics: RequestChannel.Metrics) extends KafkaMetricsGroup {
+
+  import RequestChannel._
+   
+   // requestQueue是一个队列，处理的线程是从这里面拿的
+  private val requestQueue = new ArrayBlockingQueue[BaseRequest](queueSize)
+  private val processors = new ConcurrentHashMap[Int, Processor]()
+}
+```
+
+dataPlaneRequestHandlerPool是处理线程池，
+```Scala
+class KafkaRequestHandlerPool(val brokerId: Int,
+                              val requestChannel: RequestChannel,
+                              val apis: ApiRequestHandler,
+                              time: Time,
+                              numThreads: Int,
+                              requestHandlerAvgIdleMetricName: String,
+                              logAndThreadNamePrefix : String) extends Logging with KafkaMetricsGroup {
+
+  private val threadPoolSize: AtomicInteger = new AtomicInteger(numThreads)
+  /* a meter to track the average free capacity of the request handlers */
+  private val aggregateIdleMeter = newMeter(requestHandlerAvgIdleMetricName, "percent", TimeUnit.NANOSECONDS)
+
+  this.logIdent = "[" + logAndThreadNamePrefix + " Kafka Request Handler on Broker " + brokerId + "], "
+  val runnables = new mutable.ArrayBuffer[KafkaRequestHandler](numThreads)
+  for (i <- 0 until numThreads) {
+    createHandler(i)
+  }
+
+  def createHandler(id: Int): Unit = synchronized {
+    runnables += new KafkaRequestHandler(id, brokerId, aggregateIdleMeter, threadPoolSize, requestChannel, apis, time)
+    KafkaThread.daemon(logAndThreadNamePrefix + "-kafka-request-handler-" + id, runnables(id)).start()
+  }
+}
+```
+
+```Scala
+  override def handle(request: RequestChannel.Request, requestLocal: RequestLocal): Unit = {
+    try {
+      trace(s"Handling request:${request.requestDesc(true)} from connection ${request.context.connectionId};" +
+        s"securityProtocol:${request.context.securityProtocol},principal:${request.context.principal}")
+
+      if (!apiVersionManager.isApiEnabled(request.header.apiKey)) {
+        // The socket server will reject APIs which are not exposed in this scope and close the connection
+        // before handing them to the request handler, so this path should not be exercised in practice
+        throw new IllegalStateException(s"API ${request.header.apiKey} is not enabled")
+      }
+
+      request.header.apiKey match {
+        case ApiKeys.PRODUCE => handleProduceRequest(request, requestLocal)
+        case ApiKeys.FETCH => handleFetchRequest(request)
+        case ApiKeys.LIST_OFFSETS => handleListOffsetRequest(request)
+        case ApiKeys.METADATA => handleTopicMetadataRequest(request)
+        case ApiKeys.LEADER_AND_ISR => handleLeaderAndIsrRequest(request)
+        case ApiKeys.STOP_REPLICA => handleStopReplicaRequest(request)
+```
+
+问题： 生产者会在Socket中按顺序把消息发送，多线程的handler会乱序，如何保证顺序
+
+mute: read的长注册，改成读一次之后，mute把read事件取消注册
+
+![mute.png](../images/mute.png)
+
+producer通过协商，将message发送到server侧的socket queue, 如果没有mute的情况，会将消息全部接受，不能保证有序性
 
 ### Controller
 
