@@ -316,37 +316,16 @@ https://blog.csdn.net/qq_33204709/article/details/137098027
 
 ![SocketServer.png](SocketServer.png)
 
-KafkaServer.startup()构造方法的初始化各个组件
+KafkaServer.startup()初始化各个组件, 包括kafkaController，groupCoordinator等,初始化和请求处理模块使用SocketServer.startup
+
+和请求处理模块相关的如下：
 ```Scala
 socketServer = new SocketServer(config, metrics, time, credentialProvider, apiVersionManager)
 // 开始连接和处理线程
 socketServer.startup(startProcessingRequests = false)
-
-val dataPlaneRequestChannel = new RequestChannel(maxQueuedRequests, DataPlaneMetricPrefix, time, apiVersionManager.newRequestMetrics)
-
-dataPlaneRequestProcessor = new KafkaApis(socketServer.dataPlaneRequestChannel, zkSupport, replicaManager, groupCoordinator, transactionCoordinator,
-    autoTopicCreationManager, config.brokerId, config, configRepository, metadataCache, metrics, authorizer, quotaManagers,
-    fetchManager, brokerTopicStats, clusterId, time, tokenManager, apiVersionManager)
-
-// 处理线程池
-dataPlaneRequestHandlerPool = new KafkaRequestHandlerPool(config.brokerId, socketServer.dataPlaneRequestChannel, dataPlaneRequestProcessor, time,
-    config.numIoThreads, s"${SocketServer.DataPlaneMetricPrefix}RequestHandlerAvgIdlePercent", SocketServer.DataPlaneThreadPrefix)
-
 ```
 
-dataPlaneRequestChannel，就是传输Request/Response的通道
-
-就RequestChannel类本身的主体功能而言，它定义了最核心的 3 个属性：requestQueue、queueSize 和 processors
-
-
-
-服务端如何管理这么多的连接，完成请求和响应的正确匹配
-
-接受的message如何保证顺序处理
-
-RequestChannel, KafkaApis, KafkaRequestHandlerPool三者的关系
-
-
+startup函数创建了接受连接的Acceptor和处理读写的Processor，endpoints是ip+port，每一个都会新建一个Acceptor和多个处理Processor(num.network.threads)
 ```Scala
 // SocketServer.scala
 private val dataPlaneProcessors = new ConcurrentHashMap[Int, Processor]()
@@ -379,78 +358,269 @@ private def createDataPlaneAcceptorsAndProcessors(dataProcessorsPerListener: Int
    }
 }
 ```
-Acceptor即NIO模型中处理连接部分
 
+Processor类主要的结构有newConnections，用于保存的是要创建的新连接信息；responseQueue
 
+处理的流程就是dataPlaneAcceptor处理完连接之后，会选择一个Processor
+
+Acceptor.run();和通常的NIO相似，注册OP_ACCEPT事件，不断循环
 ```Scala
-class RequestChannel(val queueSize: Int,
-                     val metricNamePrefix: String,
-                     time: Time,
-                     val metrics: RequestChannel.Metrics) extends KafkaMetricsGroup {
-
-  import RequestChannel._
-   
-   // requestQueue是一个队列，处理的线程是从这里面拿的
-  private val requestQueue = new ArrayBlockingQueue[BaseRequest](queueSize)
-  private val processors = new ConcurrentHashMap[Int, Processor]()
+def run(): Unit = {
+ serverChannel.register(nioSelector, SelectionKey.OP_ACCEPT)
+ // 等待Acceptor线程启动完成
+ startupComplete()
+ try {
+   while (isRunning) {
+     try {
+       acceptNewConnections()
+       closeThrottledConnections()
+     }
+     catch {
+     }
+   }
+ } finally {
+ }
 }
 ```
 
-dataPlaneRequestHandlerPool是处理线程池，
+acceptNewConnections;轮询选择和Acceptor关联的processor，然后把SocketChannel放入到processor的newConnections就结束了
 ```Scala
-class KafkaRequestHandlerPool(val brokerId: Int,
-                              val requestChannel: RequestChannel,
-                              val apis: ApiRequestHandler,
-                              time: Time,
-                              numThreads: Int,
-                              requestHandlerAvgIdleMetricName: String,
-                              logAndThreadNamePrefix : String) extends Logging with KafkaMetricsGroup {
+  private def acceptNewConnections(): Unit = {
+    // 每500毫秒获取一次就绪I/O事件
+    val ready = nioSelector.select(500)
+    if (ready > 0) {
+      val keys = nioSelector.selectedKeys()
+      val iter = keys.iterator()
+      while (iter.hasNext && isRunning) {
+        try {
+          val key = iter.next
+          iter.remove()
 
-  private val threadPoolSize: AtomicInteger = new AtomicInteger(numThreads)
-  /* a meter to track the average free capacity of the request handlers */
-  private val aggregateIdleMeter = newMeter(requestHandlerAvgIdleMetricName, "percent", TimeUnit.NANOSECONDS)
-
-  this.logIdent = "[" + logAndThreadNamePrefix + " Kafka Request Handler on Broker " + brokerId + "], "
-  val runnables = new mutable.ArrayBuffer[KafkaRequestHandler](numThreads)
-  for (i <- 0 until numThreads) {
-    createHandler(i)
+          if (key.isAcceptable) {
+            // 调用accept方法创建Socket连接
+            accept(key).foreach { socketChannel =>
+              var retriesLeft = synchronized(processors.length)
+              var processor: Processor = null
+              do {
+                retriesLeft -= 1
+                processor = synchronized {
+                  // 指定由哪个Processor线程进行处理
+                  currentProcessorIndex = currentProcessorIndex % processors.length
+                  processors(currentProcessorIndex)
+                }
+                // 更新Processor线程序号
+                currentProcessorIndex += 1
+              } while (!assignNewConnection(socketChannel, processor, retriesLeft == 0))
+            }
+          } else
+            throw new IllegalStateException("Unrecognized key state for acceptor thread.")
+        } catch {
+        }
+      }
+    }
   }
+```
 
-  def createHandler(id: Int): Unit = synchronized {
-    runnables += new KafkaRequestHandler(id, brokerId, aggregateIdleMeter, threadPoolSize, requestChannel, apis, time)
-    KafkaThread.daemon(logAndThreadNamePrefix + "-kafka-request-handler-" + id, runnables(id)).start()
-  }
+同时，processor也在循环拿newConnections的SocketChannel注册OP_READ
+```Scala
+override def run(): Unit = {
+ startupComplete() // 等待Processor线程启动完成
+ try {
+   while (isRunning) {
+     try {
+       // setup any new connections that have been queued up
+       configureNewConnections() // 创建新连接
+       // register any new responses for writing
+       processNewResponses() // 发送Response，并将Response放入到inflightResponses临时队列
+       processCompletedReceives() // 将接收到的Request放入Request队列
+       processCompletedSends() // 为临时Response队列中的Response执行回调逻辑
+       processDisconnected() // 处理因发送失败而导致的连接断开
+       closeExcessConnections() // 关闭超过配额限制部分的连接
+     } catch {
+     }
+   }
+ } finally {
+ }
 }
+```
+
+configureNewConnections
+```Scala
+  private def configureNewConnections(): Unit = {
+    var connectionsProcessed = 0 // 当前已配置的连接数计数器
+   // 如果没超配额并且有待处理新连接
+    while (connectionsProcessed < connectionQueueSize && !newConnections.isEmpty) { 
+      val channel = newConnections.poll() // 从连接队列中取出SocketChannel
+      try {
+        // 用给定Selector注册该Channel
+        // 底层就是调用Java NIO的SocketChannel.register(selector, SelectionKey.OP_READ)
+        selector.register(connectionId(channel.socket), channel)
+        connectionsProcessed += 1 // 更新计数器
+      } catch {
+      }
+    }
+  }
+```
+
+以上流程可以总结为：
+
+![server_acceptor.png](../images/server_acceptor.png)
+
+processCompletedReceives处理接收到的读写消息，正常情况下将会把receive转换成req对象，然后requestChannel将Request添加到Request队列requestQueue
+```Scala
+  // Processor从底层Socket 通道不断读取已接收到的网络请求，然后转换成Request实例，并将其放入到Request队列
+  private def processCompletedReceives(): Unit = {
+    // 遍历所有已接收的Request
+    selector.completedReceives.forEach { receive =>
+      try {
+        // 保证对应连接通道已经建立
+        openOrClosingChannel(receive.source) match {
+          case Some(channel) =>
+            val header = parseRequestHeader(receive.payload)
+            if (header.apiKey == ApiKeys.SASL_HANDSHAKE && channel.maybeBeginServerReauthentication(receive,
+              () => time.nanoseconds()))
+              trace(s"Begin re-authentication: $channel")
+            else {
+              val nowNanos = time.nanoseconds()
+              // 如果认证会话已过期，则关闭连接
+              if (channel.serverAuthenticationSessionExpired(nowNanos)) {
+           
+              } else {
+                val connectionId = receive.source
+                val context = new RequestContext(header, connectionId, channel.socketAddress,
+                  channel.principal, listenerName, securityProtocol,
+                  channel.channelMetadataRegistry.clientInformation, isPrivilegedListener, channel.principalSerde)
+
+                val req = new RequestChannel.Request(processor = id, context = context,
+                  startTimeNanos = nowNanos, memoryPool, receive.payload, requestChannel.metrics, None)
+                 
+                if (header.apiKey == ApiKeys.API_VERSIONS) {
+                  val apiVersionsRequest = req.body[ApiVersionsRequest]
+                  if (apiVersionsRequest.isValid) {
+                    channel.channelMetadataRegistry.registerClientInformation(new ClientInformation(
+                      apiVersionsRequest.data.clientSoftwareName,
+                      apiVersionsRequest.data.clientSoftwareVersion))
+                  }
+                }
+                // 核心代码：将Request添加到Request队列
+                requestChannel.sendRequest(req)
+                selector.mute(connectionId)
+                handleChannelMuteEvent(connectionId, ChannelMuteEvent.REQUEST_RECEIVED)
+              }
+            }
+          case None =>
+            // This should never happen since completed receives are processed immediately after `poll()`
+            throw new IllegalStateException(s"Channel ${receive.source} removed from selector before processing completed receive")
+        }
+      } catch {
+      }
+    }
+    selector.clearCompletedReceives()
+  }
+```
+
+dataPlaneRequestChannel是传输Request/Response的**通道**, 作为参数传入到processor里面
+```Scala
+val dataPlaneRequestChannel = new RequestChannel(maxQueuedRequests, DataPlaneMetricPrefix, time, apiVersionManager.newRequestMetrics)
+
+val processor = newProcessor(nextProcessorId, dataPlaneRequestChannel, connectionQuotas,
+   listenerName, securityProtocol, memoryPool, isPrivilegedListener)
+```
+
+同时它作为参数传入到处理工作线程池里面
+```Scala
+/* start processing requests */
+dataPlaneRequestProcessor = new KafkaApis(socketServer.dataPlaneRequestChannel, zkSupport, replicaManager, groupCoordinator, transactionCoordinator,
+    autoTopicCreationManager, config.brokerId, config, configRepository, metadataCache, metrics, authorizer, quotaManagers,
+    fetchManager, brokerTopicStats, clusterId, time, tokenManager, apiVersionManager)
+
+// 处理线程池
+dataPlaneRequestHandlerPool = new KafkaRequestHandlerPool(config.brokerId, socketServer.dataPlaneRequestChannel, dataPlaneRequestProcessor, time,
+    config.numIoThreads, s"${SocketServer.DataPlaneMetricPrefix}RequestHandlerAvgIdlePercent", SocketServer.DataPlaneThreadPrefix)
+```
+
+所以工作线程启动的时候是去拿dataPlaneRequestChannel的数据, 然后调用KafkaApis.handle
+```Scala
+ def run(): Unit = {
+    while (!stopped) {
+      val req = requestChannel.receiveRequest(300)
+      req match {
+        case RequestChannel.ShutdownRequest =>
+          completeShutdown()
+          return
+        case request: RequestChannel.Request =>
+          try {
+            request.requestDequeueTimeNanos = endTime
+            apis.handle(request, requestLocal)
+          } catch {
+          }
+        case null => // continue
+      }
+    }
+    completeShutdown()
+  }
 ```
 
 ```Scala
   override def handle(request: RequestChannel.Request, requestLocal: RequestLocal): Unit = {
-    try {
-      trace(s"Handling request:${request.requestDesc(true)} from connection ${request.context.connectionId};" +
-        s"securityProtocol:${request.context.securityProtocol},principal:${request.context.principal}")
+  try {
+    trace(s"Handling request:${request.requestDesc(true)} from connection ${request.context.connectionId};" +
+      s"securityProtocol:${request.context.securityProtocol},principal:${request.context.principal}")
 
-      if (!apiVersionManager.isApiEnabled(request.header.apiKey)) {
-        // The socket server will reject APIs which are not exposed in this scope and close the connection
-        // before handing them to the request handler, so this path should not be exercised in practice
-        throw new IllegalStateException(s"API ${request.header.apiKey} is not enabled")
-      }
+    if (!apiVersionManager.isApiEnabled(request.header.apiKey)) {
+      // The socket server will reject APIs which are not exposed in this scope and close the connection
+      // before handing them to the request handler, so this path should not be exercised in practice
+      throw new IllegalStateException(s"API ${request.header.apiKey} is not enabled")
+    }
 
-      request.header.apiKey match {
-        case ApiKeys.PRODUCE => handleProduceRequest(request, requestLocal)
-        case ApiKeys.FETCH => handleFetchRequest(request)
-        case ApiKeys.LIST_OFFSETS => handleListOffsetRequest(request)
-        case ApiKeys.METADATA => handleTopicMetadataRequest(request)
-        case ApiKeys.LEADER_AND_ISR => handleLeaderAndIsrRequest(request)
-        case ApiKeys.STOP_REPLICA => handleStopReplicaRequest(request)
+    request.header.apiKey match {
+      case ApiKeys.PRODUCE => handleProduceRequest(request, requestLocal)
+      case ApiKeys.FETCH => handleFetchRequest(request)
+      case ApiKeys.LIST_OFFSETS => handleListOffsetRequest(request)
+      case ApiKeys.METADATA => handleTopicMetadataRequest(request)
+      case ApiKeys.LEADER_AND_ISR => handleLeaderAndIsrRequest(request)
+      case ApiKeys.STOP_REPLICA => handleStopReplicaRequest(request)
+    }
+  }
+}
 ```
 
-问题： 生产者会在Socket中按顺序把消息发送，多线程的handler会乱序，如何保证顺序
+由于req是包含了processor和RequestContext等信息，所以结束处理的时候，可以对应发送到RequestChannel.Response,再有processor的processNewResponses发送
 
-mute: read的长注册，改成读一次之后，mute把read事件取消注册
+上述就回答了一个问题：服务端如何管理这么多的连接，完成请求和响应的正确匹配
+
+第二个问题：生产者会在Socket中按顺序把消息发送，工作线程是多线程会乱序处理，如何保证顺序的？
+
+processCompletedReceives的selector.mute(connectionId)
+
+mute: 把read的长注册改成读一次之后，就把read事件取消注册
 
 ![mute.png](../images/mute.png)
 
 producer通过协商，将message发送到server侧的socket queue, 如果没有mute的情况，会将消息全部接受，不能保证有序性
+
+第三个问题：请求是如何区分优先级？
+
+Kafka请求类型划分为两大类：数据类请求和控制类请求。Data plane和Control plane的字面意思是数据面和控制面，各自对应数据类请求和控制类请求，也就是说Data plane负责处理数据类请求，Control plane负责处理控制类请求
+
+Controller与Broker交互的请求类型有3种：LeaderAndIsrRequest、StopReplicaRequest和UpdateMetadataRequest。这3类请求属于控制类请求，通常应该被赋予高优先级。PRODUCE和FETCH请求，就是典型的数据类请求
+
+```Scala
+// control-plane 
+// 用于处理控制类请求的Processor线程 
+// 注意：目前定义了专属的Processor线程而非线程池处理控制类请求 
+private var controlPlaneProcessorOpt : Option[Processor] = None 
+private[network] var controlPlaneAcceptorOpt : Option[Acceptor] = None
+// 处理控制类请求专属的RequestChannel对象 
+val controlPlaneRequestChannelOpt: Option[RequestChannel] = config.controlPlaneListenerName
+        .map(_ => new RequestChannel(20, ControlPlaneMetricPrefix))
+```
+
+Control plan的Processor线程就只有1个，Acceptor线程也是1个。另外，对应的RequestChannel的请求队列长度被硬编码成了20，而不是一个可配置的值。
+*即控制类请求的数量应该远远小于数据类请求，因而不需要为它创建线程池和较深的请求队列。*
+
+**所以**社区定义了多套监听器以及底层处理线程的方式来区分这两大类请求。在实际应用中，由于数据类请求的数量要远多于控制类请求，
+因此，为控制类请求单独定义处理资源的做法，实际上就等同于拔高了控制类请求的优先处理权。从这个角度上来说，这套做法间接实现了优先级的区别对待
 
 ### Controller
 

@@ -782,8 +782,7 @@ void init(Channel channel) {
  
 
     ChannelPipeline p = channel.pipeline();
-
-.....
+    
 // todo 这个不是主线程执行的?
     p.addLast(new ChannelInitializer<Channel>() {
         @Override
@@ -828,6 +827,10 @@ AbstractChannel.java
 
             safeSetSuccess(promise);
             pipeline.fireChannelRegistered();
+        } catch (java.lang.Exception e) {
+            throw new RuntimeException(e);
+        }
+}
 ```
 
 上面这段代码是观察者？是咋操作的啊
@@ -847,10 +850,65 @@ AbstractChannel.java
     ![外碎片.png](外碎片.png)
 
 
+### 粘包和半包
 
+根本原因：**TCP 是流式协议，消息无边界**
 
-**一致性的问题是由多副本引出的**
+UDP像邮寄的包裹，虽然一次运输多个，但每个包裹都有“界限”，一个一个签收， 所以无粘包、半包问题
 
+粘包的主要原因：
+- 发送方每次写入数据 < 套接字缓冲区大小
+- 接收方读取套接字缓冲区数据不够及时
 
+半包的主要原因：
+- 发送方写入数据 > 套接字缓冲区大小
+- 发送的数据大于协议的MTU，必须拆包
 
+**解决问题的根本手段：找出消息的边界：**
 
+| 方式\比较 | 寻找消息边界方式                  | 优点 | 缺点                     | 推荐度 |
+| --- |---------------------------| --- |------------------------| --- |
+| TCP连接改成短连接，一个请求一个短连接 | 建立连接到释放连接之间的信息即为传输信息      | 简单 | 效率低下                   | 不推荐 |
+| 固定长度 `ABC|DEF|GHI`                    | 满足固定长度即可 | 简单 | 空间浪费 | 不推荐 |
+| 分割符`ABC\ndef\nghi` | 分隔符之间                     | 空间不浪费，也比较简单 | 内容本身出现分隔符时需转义，所以需要扫描内容 | 推荐 |
+| 固定长度字段存个内容的长度信息`Length | Actual Content` | 先解析固定长度的字段获取长度，然后读取后续内容 | 精确定位用户数据，内容也不用转义 | 长度理论上有限制，需提前预知内容可能的最大长度从而定义长度占用字节数 | 推荐+ |
+| 其他方式 | 每种都不同，例如JSON可以看{}是否已经成对   | 衡量实际应用场景，很多是对现有协议的支持 |                        |  |
+
+Netty对三种常用封帧方式的支持:
+
+| 方式\支持 | 解码 | 编码 |
+| --- | --- | --- |
+| 固定长度 | FixedLengthFrameDecoder | 简单 |
+| 分割符 | DelimiterBasedFrameDecoder | 简单 |
+| 固定长度字段存个内容的长度信息 | LengthFieldBasedFrameDecoder | LengthFieldPrepender |
+
+1. 解码核心工作流程？
+
+   解码的工作是在将字节解码为消息ByteToMessageDecoder#channelRead
+   ```Java
+   public abstract class ByteToMessageDecoder extends ChannelInboundHandlerAdapter {
+      public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+          if (msg instanceof ByteBuf) {
+              selfFiredChannelRead = true;
+              CodecOutputList out = CodecOutputList.newInstance();
+              try {
+                  // cumulation是数据积累器
+                  first = cumulation == null;
+                  cumulation = cumulator.cumulate(ctx.alloc(),
+                          first ? Unpooled.EMPTY_BUFFER : cumulation, (ByteBuf) msg);
+                  callDecode(ctx, cumulation, out);
+              }
+          }
+      }
+   }
+   ```
+   
+   cumulation是数据积累器, 默认是MERGE_CUMULATOR，callDecode会拿积累器的数据进行解码。
+
+2. 解码中两种数据积累器（Cumulator）的区别?
+
+   - MERGE_CUMULATOR: Cumulate ByteBufs by merge them into one ByteBuf's, using **memory copies**
+   - COMPOSITE_CUMULATOR: no memory copy, 像list一样组合起来
+
+   为什么选择MERGE_CUMULATOR作为默认的：
+   因为组合的方式没有经过充分的证明：证明在所有场景下肯定比内存复制的性能要好（毕竟组合方式的指针维护复杂些，如果解码是把组合的直接能拆出来就可以用）
