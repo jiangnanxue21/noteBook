@@ -51,7 +51,7 @@ AOF的问题：
 
 1. AOF的写回策略
 
-   ![](AOF的写回策略.png)
+   ![](../images/AOF的写回策略.png)
    
    选择合适的写回策略可以在数据丢失和写盘很慢中"trade-off"
 
@@ -71,9 +71,9 @@ auto-aof-rewrite-percentage：当前AOF文件大小和上一次重写后AOF文�
 
 重写的流程：一个拷贝，两处日志
 
-![](AOF重写.png)
+![](../images/AOF重写.png)
 
-![](AOF重写过程.png)
+![](../images/AOF重写过程.png)
 
 “一个拷贝”就是指，每次执行重写时，主线程fork出后台的bgrewriteaof子进程
 
@@ -113,7 +113,7 @@ auto-aof-rewrite-percentage：当前AOF文件大小和上一次重写后AOF文�
 
 为了快照而暂停写操作，肯定是不能接受的。所以这个时候，Redis就会借助操作系统提供的写时复制技术（Copy-On-Write, COW），在执行快照的同时，正常处理写操作
 
-![](RDB写时复制.png)
+![](../images/RDB写时复制.png)
 
 如果主线程要修改一块数据C，那么，这块数据就会被复制一份，生成该数据的副本（键值对 C’）。然后，主线程在这个数据副本上进行修改。bgsave子进程可以继续把原来的数据（键值对 C）写入RDB文件
 
@@ -125,7 +125,7 @@ auto-aof-rewrite-percentage：当前AOF文件大小和上一次重写后AOF文�
 
 Redis 4.0中提出了一个混合使用AOF日志和内存快照的方法能利用RDB的快速恢复，又能以较小的开销做到尽量少丢数据
 
-![](AOF_RDB.png)
+![](../images/AOF_RDB.png)
 
 AOF+RDB的选择：
 1. 数据不能丢失时，内存快照和AOF 的混合使用是一个很好的选择
@@ -141,14 +141,14 @@ AOF+RDB的选择：
 - 读操作：主库、从库都可以接收
 - 写操作：首先到主库执行，然后，主库将写操作同步给从库
 
-![](redis读写分离.png)
+![](../images/redis读写分离.png)
 
 可以通过主从级联模式分担全量复制时的主库压力
 
 ```
 replicaof  所选从库的IP 6379
 ```
-![](redis级联.png)
+![](../images/redis级联.png)
 
 #### 主从库同步流程
 
@@ -159,7 +159,7 @@ replicaof 172.16.19.3 6379
 
 - 第一次主从同步流程
 
-    ![](redis第一次同步.png)
+    ![](../images/redis第一次同步.png)
 
 1. 主从库间建立连接、协商同步；FULLRESYNC响应表示第一次复制采用的全量复制
 2. 主库将所有数据同步给从库。从库收到数据后，在本地完成数据加载
@@ -169,15 +169,15 @@ replicaof 172.16.19.3 6379
 
   - repl_backlog_buffer: 主从间的增量同步。主节点只有一个repl_backlog_buffer缓冲区，各个从节点的offset偏移量都是相对该缓冲区而言的
   
-  ![repl_backlog_buffer.png](repl_backlog_buffer.png)
+  ![repl_backlog_buffer.png](../images/repl_backlog_buffer.png)
 
      为了从库断开之后，找到主从差异数据而设计的环形缓冲区，避免全量同步带来的性能开销。如果从库断开时间太久，repl_backlog_buffer环形缓冲区被主库的写命令覆盖了，那么从库连上主库后只能乖乖地进行一次全量同步，所以repl_backlog_buffer配置尽量大一些，可以降低主从断开后全量同步的概率
 
-![增量复制.png](增量复制.png)
+![增量复制.png](../images/增量复制.png)
 
   - replication buffer: 这个buffer专门用来传播用户的写命令到从库，保证主从数据一致，我们通常把它叫做replication buffer;用于主节点与各个从节点间数据的批量交互。主节点为各个从节点分别创建一个缓冲区，由于各个从节点的处理能力差异，各个缓冲区数据可能不同
 
-![buffer.png](buffer.png)
+![buffer.png](../images/buffer.png)
 
 ### 哨兵机制
 
@@ -189,7 +189,7 @@ replicaof 172.16.19.3 6379
 
 哨兵主要负责的就是三个任务：监控、选主（选择主库）和通知
 
-![哨兵机制的三项任务与目标.png](哨兵机制的三项任务与目标.png)
+![哨兵机制的三项任务与目标.png](../images/哨兵机制的三项任务与目标.png)
 
 #### 监控
 - 主观下线
@@ -199,8 +199,8 @@ replicaof 172.16.19.3 6379
 
       在判断主库是否下线时，不能由一个哨兵说了算，只有大多数的哨兵实例，都判断主库已经“主观下线”了，主库才会被标记为“客观下线”
   
-  ![客观下线的判断.png](客观下线的判断.png)
+  ![客观下线的判断.png](../images/客观下线的判断.png)
 
 #### 选主
 
-![新主库的选择.png](新主库的选择.png)
+![新主库的选择.png](../images/新主库的选择.png)

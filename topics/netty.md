@@ -51,14 +51,14 @@ ServerSocketChannel ss = ServerSocketChannel.open(); // 服务端开启监听：
 ss.bind(new InetSocketAddress(9090));
 ss.configureBlocking(false); // 重点: OS NONBLOCKING!!!, 只让接受客户端, 不阻塞
 
-while (true) {
-  // 接受客户端的连接
-  SocketChannel client = ss.accept(); 
-  if (client == null) {
-    // 如果没有连接，直接返回null
-   } else {
-    // 读取数据流程
-}
+while (true){
+// 接受客户端的连接
+SocketChannel client = ss.accept(); 
+  if(client ==null){
+        // 如果没有连接，直接返回null
+        }else{
+        // 读取数据流程
+        }
 ```
 
 NIO慢在哪里：
@@ -835,7 +835,6 @@ AbstractChannel.java
 
 上面这段代码是观察者？是咋操作的啊
 
-
 ### 内存管理系统
 
 内存池设计
@@ -902,11 +901,9 @@ Netty对三种常用封帧方式的支持:
       }
    }
    ```
-   
    cumulation是数据积累器, 默认是MERGE_CUMULATOR，callDecode会拿积累器的数据进行解码。
 
 2. 解码中两种数据积累器（Cumulator）的区别?
-
    - MERGE_CUMULATOR: Cumulate ByteBufs by merge them into one ByteBuf's, using **memory copies**
    - COMPOSITE_CUMULATOR: no memory copy, 像list一样组合起来
 

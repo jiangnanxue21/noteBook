@@ -310,7 +310,7 @@ https://blog.csdn.net/qq_33204709/article/details/137098027
       - unclean.leader.election.enable=false。控制哪些Broker有资格竞选分区的Leader。不允许一个Broker落后原先的Leader太多当Leader，
 
 
-### Server请求处理模块
+### 3.2 Server请求处理模块
 
 整体架构:
 
@@ -620,9 +620,9 @@ Control plan的Processor线程就只有1个，Acceptor线程也是1个。另外�
 *即控制类请求的数量应该远远小于数据类请求，因而不需要为它创建线程池和较深的请求队列。*
 
 **所以**社区定义了多套监听器以及底层处理线程的方式来区分这两大类请求。在实际应用中，由于数据类请求的数量要远多于控制类请求，
-因此，为控制类请求单独定义处理资源的做法，实际上就等同于拔高了控制类请求的优先处理权。从这个角度上来说，这套做法间接实现了优先级的区别对待
+因此，为控制类请求单独定义处理资源的做法，实际上就等同于拔高了控制类请求的优先处理权。间接实现了优先级的区别对待
 
-### Controller
+### 3.3 Controller
 
 Controller在ZooKeeper的帮助下管理和协调整个Kafka
 
@@ -647,7 +647,73 @@ Controller在ZooKeeper的帮助下管理和协调整个Kafka
    
    Broker 0是控制器。当Broker 0宕机后，ZooKeeper通过Watch机制感知到并删除了/controller临时节点，然后进行重新选举
 
-#### 实现
+4. 元数据的处理方式
+
+#### **源码实现**
+Controller承载了ZooKeeper上的所有元数据，所以先看zk的初始化
+
+初始化zk，并且创建目录
+```Scala
+initZkClient(time)
+
+private def initZkClient(time: Time): Unit = {
+   // ..............
+   // 创建zk目录
+   _zkClient.createTopLevelPaths()
+
+   // These are persistent ZK paths that should exist on kafka broker startup.
+   val PersistentZkPaths = Seq(
+      ConsumerPathZNode.path, // old consumer path
+      BrokerIdsZNode.path,
+      TopicsZNode.path,
+      ConfigEntityChangeNotificationZNode.path,
+      DeleteTopicsZNode.path,
+      BrokerSequenceIdZNode.path,
+      IsrChangeNotificationZNode.path,
+      ProducerIdBlockZNode.path,
+      LogDirEventNotificationZNode.path
+   ) ++ ConfigType.all.map(ConfigEntityTypeZNode.path)
+}
+```
+
+checkedEphemeralCreate创建临时节点
+
+```Scala
+val brokerInfo = createBrokerInfo
+val brokerEpoch = zkClient.registerBroker(brokerInfo)
+
+def registerBroker(brokerInfo: BrokerInfo): Long = {
+   val path = brokerInfo.path
+   val stat = checkedEphemeralCreate(path, brokerInfo.toJsonBytes)
+   info(s"Registered broker ${brokerInfo.broker.id} at path $path with addresses: " +
+           s"${brokerInfo.broker.endPoints.map(_.connectionString).mkString(",")}, czxid (broker epoch): ${stat.getCzxid}")
+   stat.getCzxid
+}
+```
+
+临时节点的作用：如ZooKeeper中/controller节点
+
+```Text
+{"version":1,"brokerid":0,"timestamp":"1585098432431"}
+cZxid = 0x1a
+ctime = Wed Mar 25 09:07:12 CST 2020
+mZxid = 0x1a
+mtime = Wed Mar 25 09:07:12 CST 2020
+pZxid = 0x1a
+cversion = 0
+dataVersion = 0
+aclVersion = 0
+ephemeralOwner = 0x100002d3a1f0000
+dataLength = 54
+numChildren = 0
+```
+一旦 Broker 与 ZooKeeper 的会话终止，该节点就会消失
+- Controller Broker Id是0，表示序号为0的Broker是集群Controller
+- ephemeralOwner字段不是 0x0，说明这是一个临时节点
+
+一旦Broker与ZooKeeper的会话终止，该节点就会消失，产生**event事件**
+
+![zk监听.png](../images/zk监听.png)
 
 新的kafka源码把多线程的方案改成了单线程加事件队列的方案
 
@@ -658,31 +724,188 @@ Controller是在KafkaServer.scala#startup中初始化并且启动的
 kafkaController = new KafkaController(config, zkClient, time, metrics, brokerInfo, brokerEpoch, tokenManager, brokerFeatures, featureCache, threadNamePrefix)
 kafkaController.startup()
 ```
-
+比较主要的几个参数
 ```Scala
-// 第1步：注册ZooKeeper状态变更监听器，它是用于监听Zookeeper会话过期的
- zkClient.registerStateChangeHandler(new StateChangeHandler {
-   override val name: String = StateChangeHandlers.ControllerHandler
-   override def afterInitializingSession(): Unit = {
-     eventManager.put(RegisterBrokerAndReelect)
-   }
-   override def beforeInitializingSession(): Unit = {
-     val queuedEvent = eventManager.clearAndPut(Expire)
+// 
+var controllerChannelManager = new ControllerChannelManager(controllerContext, config, time, metrics,
+   stateChangeLogger, threadNamePrefix)
 
-     // Block initialization of the new session until the expiration event is being handled,
-     // which ensures that all pending events have been processed before creating the new session
-     queuedEvent.awaitProcessing()
-   }
- })
- 
- // 第2步：写入Startup事件到事件队列
- eventManager.put(Startup)
- 
- // 第3步：启动ControllerEventThread线程，开始处理事件队列中的ControllerEvent
- eventManager.start()
+// 用于管理事件处理线程和事件队列
+private[controller] val eventManager = new ControllerEventManager(config.brokerId, this, time,
+   controllerContext.stats.rateAndTimeMetrics)
+
+// 用于zk事件的处理
+private val controllerChangeHandler = new ControllerChangeHandler(eventManager)
+
+// 三个状态机
+val replicaStateMachine: ReplicaStateMachine = new ZkReplicaStateMachine(config, stateChangeLogger, controllerContext, zkClient,
+   new ControllerBrokerRequestBatch(config, controllerChannelManager, eventManager, controllerContext, stateChangeLogger))
+val partitionStateMachine: PartitionStateMachine = new ZkPartitionStateMachine(config, stateChangeLogger, controllerContext, zkClient,
+   new ControllerBrokerRequestBatch(config, controllerChannelManager, eventManager, controllerContext, stateChangeLogger))
+val topicDeletionManager = new TopicDeletionManager(config, controllerContext, replicaStateMachine,
+   partitionStateMachine, new ControllerDeletionClient(this, zkClient))
+
+// Returns true if this broker is the current controller.
+def isActive: Boolean = activeControllerId == config.brokerId
 ```
 
-这里主要看下ControllerEventManager eventManager是Controller事件管理器，负责管理事件处理线程
+![controller处理event.png](controller处理event.png)
+
+以处理controller Startup event为例：
+
+**broker如何确定自己是不是controller**
+
+在kafkaController中执行startup方法，把Startup事件到事件队列，并且启动ControllerEventThread线程，开始处理事件
+
+```Scala
+kafkaController.startup()
+
+def startup() = {
+   // 第1步：注册ZooKeeper状态变更监听器，它是用于监听Zookeeper会话过期的
+   zkClient.registerStateChangeHandler(new StateChangeHandler {
+      override val name: String = StateChangeHandlers.ControllerHandler
+      override def afterInitializingSession(): Unit = {
+         eventManager.put(RegisterBrokerAndReelect)
+      }
+
+      override def beforeInitializingSession(): Unit = {
+         val queuedEvent = eventManager.clearAndPut(Expire)
+         queuedEvent.awaitProcessing()
+      }
+   })
+
+   // 第2步：写入Startup事件到事件队列
+   eventManager.put(Startup)
+
+   // 第3步：启动ControllerEventThread线程，开始处理事件队列中的ControllerEvent
+   eventManager.start()
+}
+```
+
+eventManager启动的是内部的ControllerEventThread的doWork()
+```Scala
+ override def doWork(): Unit = {
+   val dequeued = pollFromEventQueue()
+   dequeued.event match {
+     case controllerEvent =>
+       _state = controllerEvent.state
+       try {
+          // dequeued是event事件
+         def process(): Unit = dequeued.process(processor)
+       } catch {
+       }
+       _state = ControllerState.Idle
+   }
+ }
+```
+
+然后再回去调用具体的逻辑，对于Startup事件则匹配
+```Scala
+  override def process(event: ControllerEvent): Unit = {
+  try {
+    event match {
+      case event: MockEvent =>
+        // Used only in test cases
+        event.process()
+      case Startup =>
+        processStartup()
+    }
+  }
+}
+```
+
+zk注册，带了controllerChangeHandler，也就是说，响应回来就会调用controllerChangeHandler
+```Scala
+private def processStartup(): Unit = {
+ zkClient.registerZNodeChangeHandlerAndCheckExistence(controllerChangeHandler)
+ elect()
+}
+```
+
+elect是选主的具体流程：
+```Scala
+private def elect(): Unit = {
+   // 1. 看zk有没有ControllerId
+ activeControllerId = zkClient.getControllerId.getOrElse(-1)
+
+ if (activeControllerId != -1) {
+   debug(s"Broker $activeControllerId has been elected as the controller, so stopping the election process.")
+   return
+ }
+
+ try {
+    // 这边的处理会比较奇怪，没有注册成功则直接抛异常了
+   val (epoch, epochZkVersion) = zkClient.registerControllerAndIncrementControllerEpoch(config.brokerId)
+   controllerContext.epoch = epoch
+   controllerContext.epochZkVersion = epochZkVersion
+   activeControllerId = config.brokerId
+
+   info(s"${config.brokerId} successfully elected as the controller. Epoch incremented to ${controllerContext.epoch} " +
+     s"and epoch zk version is now ${controllerContext.epochZkVersion}")
+
+    // 只有成功注册到的controller节点才会走到这一步
+   onControllerFailover()
+ } catch {
+   case e: ControllerMovedException =>
+     maybeResign()
+
+     if (activeControllerId != -1)
+       debug(s"Broker $activeControllerId was elected as controller instead of broker ${config.brokerId}", e)
+     else
+       warn("A controller has been elected but just resigned, this will result in another round of election", e)
+   case t: Throwable =>
+     error(s"Error while electing or becoming controller on broker ${config.brokerId}. " +
+       s"Trigger controller movement immediately", t)
+     triggerControllerMove()
+ }
+}
+```
+
+只有成功注册到的controller节点才会走到这一步
+```Scala
+  private def onControllerFailover(): Unit = {
+    maybeSetupFeatureVersioning()
+
+    info("Registering handlers")
+
+    // 注册the listeners to get broker/topic callbacks
+    val childChangeHandlers = Seq(brokerChangeHandler, topicChangeHandler, topicDeletionHandler, logDirEventNotificationHandler,
+      isrChangeNotificationHandler)
+    childChangeHandlers.foreach(zkClient.registerZNodeChildChangeHandler)
+
+    val nodeChangeHandlers = Seq(preferredReplicaElectionHandler, partitionReassignmentHandler)
+    nodeChangeHandlers.foreach(zkClient.registerZNodeChangeHandlerAndCheckExistence)
+   
+   // 重要
+    initializeControllerContext()
+  
+    topicDeletionManager.init(topicsToBeDeleted, topicsIneligibleForDeletion)
+
+    // We need to send UpdateMetadataRequest after the controller context is initialized and before the state machines
+    // are started. The is because brokers need to receive the list of live brokers from UpdateMetadataRequest before
+    // they can process the LeaderAndIsrRequests that are generated by replicaStateMachine.startup() and
+    // partitionStateMachine.startup().
+    info("Sending update metadata request")
+    sendUpdateMetadataRequest(controllerContext.liveOrShuttingDownBrokerIds.toSeq, Set.empty)
+
+    replicaStateMachine.startup()
+    partitionStateMachine.startup()
+
+    info(s"Ready to serve as the new controller with epoch $epoch")
+
+    initializePartitionReassignments()
+    topicDeletionManager.tryTopicDeletion()
+    val pendingPreferredReplicaElections = fetchPendingPreferredReplicaElections()
+    onReplicaElection(pendingPreferredReplicaElections, ElectionType.PREFERRED, ZkTriggered)
+    info("Starting the controller scheduler")
+    kafkaScheduler.startup()
+```
+
+### 3.4 副本管理模块
+
+
+
+
 
 ## 延时操作模块
 

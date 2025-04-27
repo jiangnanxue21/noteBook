@@ -48,9 +48,11 @@ SpringApplication application = new SpringApplication(MyApplication. class);
 application. run(args)
 }
 
-## bagging算法
+## 集成学习
 
-### 随机森林
+### bagging算法
+
+#### 随机森林
 
 
 虽然原理上很简单，但随机森林的学习能力异常强大、算法复杂度高、又具备一定的抗过拟合能力，是从根本上来说比单棵决策树更优越的算法。即便在深入了解机器学习的各种技巧之后，它依然是我们能够使用的最强大的算法之一。原理如此简单、还如此强大的算法在机器学习的世界中是不常见的。**在机器学习竞赛当中，随机森林往往是我们在中小型数据上会尝试的第一个算法**。
@@ -77,7 +79,7 @@ result_t = cross_validate(reg_t #要进行交叉验证的评估器
 ```
 
 
-## boosting算法
+### boosting算法
 
 Boosting PK Bagging
 
@@ -111,7 +113,7 @@ Boosting PK Bagging
 
 依据上一个弱评估器$f(x)_{t-1}$的结果，计算损失函数$L(x,y)$， 并使用$L(x,y)$自适应地影响下一个弱评估器$f(x)_t$的构建。集成模型输出的结果，受到整体所有弱评估器$f(x)_0$ ~ $f(x)_T$的影响。
 
-### AdaBoost
+#### AdaBoost
 
 AdaBoost的构筑过程非常简单：**首先，在全样本上建立一棵决策树，根据该决策树预测的结果和损失函数值，增加被预测错误的样本在数据集中的样本权重，并让加权后的数据集被用于训练下一棵决策树**。这个过程相当于有意地加重“难以被分类正确的样本”的权重，同时降低“容易被分类正确的样本”的权重，而将后续要建立的弱评估器的注意力引导到难以被分类正确的样本上。
 
@@ -265,9 +267,9 @@ why masked? 因为token是一个个产生的，从左到右
 q来自于Decoder，K,V来自于Encoder
 
 
-# 时间序列
+## 时间序列
 
-## 1. EGADS
+### 1. EGADS
 
 参考雅虎EGADS，实现用于大规模时间序列数据自动化异常检测的通用和可扩展框架
 
@@ -312,15 +314,17 @@ data leak: 你的模型在无意间已经拿到了验证集的信息, 交叉验�
 
 ### 时间序列的评估
 
-##  Prompt Engineering
+## 大模型
 
-### Prompting Principles
+###  Prompt Engineering
+
+#### Prompting Principles
 - **Principle 1: Write clear and specific instructions**
 - **Principle 2: Give the model time to “think”**
 
-### Tactics
+#### Tactics
 
-#### Tactic 1: Use delimiters to clearly indicate distinct parts of the input
+**Tactic 1: Use delimiters to clearly indicate distinct parts of the input**
 - Delimiters can be anything like: ```, """, < >, `<tag> </tag>`, `:`
 
 使用```将文本隔开：
@@ -346,7 +350,7 @@ response = get_completion(prompt)
 print(response)
 ```
 
-#### Tactic 2: Ask for a structured output
+**Tactic 2: Ask for a structured output**
 - JSON, HTML
 
 ```Python
@@ -360,7 +364,7 @@ response = get_completion(prompt)
 print(response)
 ```
 
-#### Tactic 3: Ask the model to check whether conditions are satisfied
+**Tactic 3: Ask the model to check whether conditions are satisfied**
 
 并且需要给出不满足条件的情况下如何做
 
@@ -417,7 +421,7 @@ Step 3 - See people out and about, having picnics, playing games, or relaxing on
 Step 4 - Spend time outdoors and appreciate the beauty of nature.
 ```
 
-#### Tactic 4: "Few-shot" prompting
+**Tactic 4: "Few-shot" prompting**
 
 少样本提示: providing examples of successful executions of the task you want performed before asking the model to do the actually task
 
@@ -438,9 +442,9 @@ response = get_completion(prompt)
 print(response)
 ```
 
-### Principle 2: Give the model time to “think”
+#### Principle 2: Give the model time to “think”
 
-#### Tactic 1: Specify the steps required to complete a task
+**Tactic 1: Specify the steps required to complete a task**
 
 我的理解是指定步骤，让他更多的思考
 ```Python
@@ -475,7 +479,7 @@ print("Completion for prompt 1:")
 print(response)
 ```
 
-#### Tactic 2: Instruct the model to work out its own solution before rushing to a conclusion
+**Tactic 2: Instruct the model to work out its own solution before rushing to a conclusion**
 
 ```Python
 prompt = f"""
@@ -572,7 +576,7 @@ response = get_completion(prompt)
 print(response)
 ```
 
-#### Model Limitations: Hallucinations
+**Model Limitations: Hallucinations**
 - Boie is a real company, the product name is not real.
 - Reducing hallucinations:
 
