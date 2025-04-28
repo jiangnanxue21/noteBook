@@ -926,7 +926,29 @@ private static class IntegerCache {
 
 ![jvm整体架构.png](../images/jvm整体架构.png)
 
-### 堆
+### 3.1 方法区
+
+栈、堆、方法区的交互关系
+
+**方法区主要存放的是Class，而堆中主要存放的是实例化的对象，方法区又称为非堆**
+
+![方法区.png](../images/方法区.png)
+
+涉及了对象的访问定位
+
+1. Person类的 .class信息存放在方法区中
+2. person变量存放在 Java栈的局部变量表中
+3. 真正person对象存放在Java堆中
+4. 在person对象中，有个指针指向方法区中的person类型数据，表明这个person对象是用方法区中的Person类new出来的
+
+方法区的大小决定了系统可以保存多少个类，如果系统定义了太多的类，导致方法区溢出，
+虚拟机同样会抛出内存溢出错误：java.lang.OutofMemoryError:PermGen space或者java.lang.OutOfMemoryError:Metaspace
+- 加载大量的第三方的jar包
+- Tomcat部署的工程过多（30~50个）
+- 大量动态的生成反射类
+
+
+### 3.2 堆
 
 1. 一个JVM实例只存在一个堆内存，堆也是Java内存管理的核心区域。
 2. Java堆区在JVM启动的时候即被创建，其空间大小也就确定了，堆是JVM管理的最大一块内存空间，并且堆内存的大小是可以调节的

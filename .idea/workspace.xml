@@ -4,8 +4,9 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="f4904cd4-1e73-4808-90e5-c91a890ae80b" name="Changes" comment="kafka更新">
+    <list default="true" id="f4904cd4-1e73-4808-90e5-c91a890ae80b" name="Changes" comment="sql AND JVM">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/topics/basic.md" beforeDir="false" afterPath="$PROJECT_DIR$/topics/basic.md" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -24,7 +25,7 @@
   <component name="GithubPullRequestsUISettings">{
   &quot;selectedUrlAndAccountId&quot;: {
     &quot;url&quot;: &quot;https://github.com/jiangnanxue21/noteBook.git&quot;,
-    &quot;accountId&quot;: &quot;48c71fdc-4e9e-4238-9169-960fc20c2d41&quot;
+    &quot;accountId&quot;: &quot;6ab8c188-9c8c-4f2b-bbe0-da35fddab808&quot;
   }
 }</component>
   <component name="InstanceColorv3">
@@ -121,45 +122,37 @@
   &quot;associatedIndex&quot;: 3
 }</component>
   <component name="ProjectId" id="2ucy9j4rW82EFVFvOcZ5S8o2v57" />
-  <component name="ProjectLevelVcsManager" settingsEditedManually="true" />
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "git-widget-placeholder": "master",
-    "kotlin-language-version-configured": "true",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
+    &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;/Users/xueguozhi/IdeaProjects/noteBook/images&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;http.proxy&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   },
-  "keyToStringList": {
-    "stardust.markdown.MarkdownSplitEditorSuppressor:keyList": [
-      "D:/source code/Writerside/topics/AI.md",
-      "D:/source code/Writerside/topics/DDIA.md",
-      "D:/source code/Writerside/topics/HBase.md",
-      "D:/source code/Writerside/topics/Introduction.md",
-      "D:/source code/Writerside/topics/JUC.md",
-      "D:/source code/Writerside/topics/Scala.md",
-      "D:/source code/Writerside/topics/Spark.md",
-      "D:/source code/Writerside/topics/basic.md",
-      "D:/source code/Writerside/topics/elasticsearch.md",
-      "D:/source code/Writerside/topics/hadoop.md",
-      "D:/source code/Writerside/topics/kafka.md",
-      "D:/source code/Writerside/topics/netty.md",
-      "D:/source code/Writerside/topics/redis.md",
-      "D:/source code/Writerside/topics/spring.md",
-      "D:/source code/Writerside/topics/分布式.md"
+  &quot;keyToStringList&quot;: {
+    &quot;stardust.markdown.MarkdownSplitEditorSuppressor:keyList&quot;: [
+      &quot;/Users/xueguozhi/IdeaProjects/noteBook/topics/basic.md&quot;,
+      &quot;/Users/xueguozhi/IdeaProjects/noteBook/topics/kafka.md&quot;,
+      &quot;/Users/xueguozhi/IdeaProjects/noteBook/topics/sql.md&quot;
     ]
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/images" />
+    </key>
     <key name="MoveFile.RECENT_KEYS">
       <recent name="D:\source code\Writerside\images" />
     </key>
@@ -167,8 +160,8 @@
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
-        <option value="bundled-jdk-9823dce3aa75-a94e463ab2e7-intellij.indexing.shared.core-IU-243.26053.27" />
-        <option value="bundled-js-predefined-d6986cc7102b-1632447f56bf-JavaScript-IU-243.26053.27" />
+        <option value="bundled-jdk-9823dce3aa75-fbdcb00ec9e3-intellij.indexing.shared.core-IU-251.23774.435" />
+        <option value="bundled-js-predefined-d6986cc7102b-f27c65a3e318-JavaScript-IU-251.23774.435" />
       </set>
     </attachedChunks>
   </component>
@@ -185,6 +178,8 @@
       <workItem from="1743593473371" duration="1211000" />
       <workItem from="1743732342622" duration="1128000" />
       <workItem from="1743738565502" duration="46257000" />
+      <workItem from="1745588742138" duration="10341000" />
+      <workItem from="1745834054545" duration="295000" />
     </task>
     <task id="LOCAL-00001" summary="kafka更新">
       <option name="closed" value="true" />
@@ -202,7 +197,31 @@
       <option name="project" value="LOCAL" />
       <updated>1743946385598</updated>
     </task>
-    <option name="localTasksCounter" value="3" />
+    <task id="LOCAL-00003" summary="sql和jvm部分">
+      <option name="closed" value="true" />
+      <created>1745589167336</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1745589167336</updated>
+    </task>
+    <task id="LOCAL-00004" summary="sql行索">
+      <option name="closed" value="true" />
+      <created>1745643497973</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1745643497973</updated>
+    </task>
+    <task id="LOCAL-00005" summary="sql AND JVM">
+      <option name="closed" value="true" />
+      <created>1745817788905</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1745817788905</updated>
+    </task>
+    <option name="localTasksCounter" value="6" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -210,6 +229,13 @@
   </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="kafka更新" />
-    <option name="LAST_COMMIT_MESSAGE" value="kafka更新" />
+    <MESSAGE value="sql和jvm部分" />
+    <MESSAGE value="sql行索" />
+    <MESSAGE value="sql AND JVM" />
+    <option name="LAST_COMMIT_MESSAGE" value="sql AND JVM" />
+  </component>
+  <component name="XSLT-Support.FileAssociations.UIState">
+    <expand />
+    <select />
   </component>
 </project>
