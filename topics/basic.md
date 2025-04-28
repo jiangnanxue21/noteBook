@@ -57,7 +57,6 @@
         //...从阿里云下载图片...
       }
     }
-    }
     ```
 
    问题：
@@ -192,24 +191,32 @@ SOLID、KISS、YAGNI、DRY、LOD
 ```Java
 // 这一部分体现了抽象意识
 public interface MessageQueue { //... }
-   public class KafkaMessageQueue implements MessageQueue { //... }
-      public class RocketMQMessageQueue implements MessageQueue {//...}
+    public class KafkaMessageQueue implements MessageQueue { //... }
+        public class RocketMQMessageQueue implements MessageQueue {//...}
 
-         public interface MessageFromatter { //... }
-            public class JsonMessageFromatter implements MessageFromatter {//...}
-               public class ProtoBufMessageFromatter implements MessageFromatter {//...}
+            public interface MessageFromatter { //... }
+                public class JsonMessageFromatter implements MessageFromatter {//...}
 
-                  public class Demo {
-                     private MessageQueue msgQueue; // 基于接口而非实现编程
-                     public Demo(MessageQueue msgQueue) { // 依赖注入
-                        this.msgQueue = msgQueue;
-                     }
+                    public class ProtoBufMessageFromatter implements MessageFromatter {//...}
 
-                     // msgFormatter：多态、依赖注入
-                     public void sendNotification(Notification notification, MessageFormatter msgFormatter) {
-                        //...    
-                     }
-                  }
+                        public class Demo {
+                            private MessageQueue msgQueue; // 基于接口而非实现编程
+
+                            public Demo(MessageQueue msgQueue) { // 依赖注入
+                                this.msgQueue = msgQueue;
+                            }
+
+                            // msgFormatter：多态、依赖注入
+                            public void sendNotification(Notification notification, MessageFormatter msgFormatter) {
+                                //...    
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
 ```
 
 #### 1.2.3 里式替换（LSP）
@@ -233,7 +240,7 @@ public class SecurityTransporter extends Transporter {
    private String appId;
    private String appToken;
 
-   ...................
+   // ...................
 
    @Override
    public Response sendRequest(Request request) {
@@ -696,17 +703,19 @@ cachedInvoker(method)是方法映射，对应的是每个方法
 public Object invoke(Object proxy, Method method, Object[] args, SqlSession sqlSession) throws Throwable {
    return mapperMethod.execute(sqlSession, args);
 }
+```
 
-.....
-
+```Java
 public Object execute(SqlSession sqlSession, Object[] args) {
-   Object result;
-   switch (command.getType()) {
-      case INSERT: {
-         Object param = method.convertArgsToSqlCommandParam(args);
-         result = rowCountResult(sqlSession.insert(command.getName(), param));
-         break;
-      }
+    Object result;
+    switch (command.getType()) {
+        case INSERT: {
+            Object param = method.convertArgsToSqlCommandParam(args);
+            result = rowCountResult(sqlSession.insert(command.getName(), param));
+            break;
+        }
+    }
+}
 ```
 
 整个流程主要是为了将执行mapper方法封装在动态代理里面
@@ -925,7 +934,8 @@ private static class IntegerCache {
 4. 所有的线程共享Java堆，在这里还可以划分线程私有的缓冲区TLAB
 5. Java虚拟机规范中对Java堆的描述是：所有的对象实例以及数组都应当在运行时分配在堆上
 
-   从实际使用角度看：“几乎”所有的对象实例都在堆分配内存，但并非全部。因为还有一些对象是在栈上分配的（逃逸分析，标量替换）
+   从实际使用角度看：“几乎”所有的对象实例都在堆分配内存，但并非全部。
+   由于*即时编译*技术的进步，尤其是*逃逸分析*技术的日渐强大，*栈上分配*、*标量替换*优化手段已经导致一些微妙的变化悄然发生，所以说Java对象实例都分配在堆上也渐渐变得不是那么绝对了
 
 6. 数组和对象可能永远不会存储在栈上（不一定），因为栈帧中保存引用，这个引用指向对象或者数组在堆中的位置
 7. 在方法结束后，堆中的对象不会马上被移除，仅仅在垃圾收集的时候才会被移除;也就是触发了GC的时候，才会进行回收.如果堆中对象马上被回收，那么用户线程就会收到影响，因为有stop the word
@@ -980,8 +990,7 @@ Java堆区用于存储Java对象实例，堆的大小在JVM启动时就已经设
 3.  如果Eden区满了，将对象往幸存区拷贝时，发现幸存区放不下啦，那只能便宜了某些新对象，让他们直接晋升至老年区
 
 #### GC分类
-
-1.  要尽量的避免垃圾回收，因为在垃圾回收的过程中，容易出现STW（Stop the World）的问题，**而Major GC 和Full GC出现STW的时间，是Minor GC的10倍以上**
+1.  要尽量的避免垃圾回收，因为在垃圾回收的过程中，容易出现STW（Stop the World）的问题，**而Major GC和Full GC出现STW的时间，是Minor GC的10倍以上**
 2.  JVM在进行GC时，并非每次都对上面三个内存区域一起回收的，大部分时候回收的都是指新生代。针对Hotspot VM的实现，它里面的GC按照回收区域又分为两大种类型：一种是部分收集（Partial GC），一种是整堆收集（FullGC）
 
 - 部分收集：不是完整收集整个Java堆的垃圾收集。其中又分为：
@@ -1000,6 +1009,44 @@ Java堆区用于存储Java对象实例，堆的大小在JVM启动时就已经设
 2.  因为Java对象大多都具备朝生夕灭的特性，所以Minor GC非常频繁，一般回收速度也比较快。这一定义既清晰又易于理解。
 3.  Minor GC会引发STW（Stop The World），暂停其它用户的线程，等垃圾回收结束，用户线程才恢复运行
 
+```Text
+[GC (Allocation Failure) [PSYoungGen: 33280K->808K(38400K)] 33280K->816K(125952K), 0.0483350 secs] [Times: user=0.00 sys=0.00, real=0.06 secs]
+```
+
+1. GC触发原因
+
+   [GC (Allocation Failure) GC：表示这是一次垃圾回收事件。
+
+   Allocation Failure：表示这次GC的触发原因是内存分配失败。通常是因为新生代（Young Generation）空间不足，无法分配新的对象。
+
+2. 新生代垃圾回收
+
+   [PSYoungGen: 33280K->808K(38400K)]
+
+   PSYoungGen：表示这次垃圾回收是针对新生代（Young Generation），并且使用了Parallel Scavenge垃圾回收器。
+
+   33280K->808K(38400K)： 33280K：表示GC之前新生代的内存使用量为33280KB。 808K：表示GC之后新生代的内存使用量为808KB。 38400K：表示新生代的总内存容量为38400KB。
+
+3. 整个堆内存的变化
+
+   33280K->816K(125952K).33280K：表示GC之前整个堆内存的使用量为33280KB。 816K：表示GC之后整个堆内存的使用量为816KB。 125952K：表示整个堆内存的总容量为125952KB。
+
+4. GC耗时
+
+   0.0483350 secs
+
+   表示这次垃圾回收总共耗时0.0483350秒。
+
+5. 时间统计
+
+   [Times: user=0.00 sys=0.00, real=0.06 secs]
+
+   user=0.00：表示用户态（User Mode）的CPU时间消耗为0.00秒。这是垃圾回收线程在用户态运行的时间。
+
+   sys=0.00：表示内核态（Kernel Mode）的CPU时间消耗为0.00秒。这是垃圾回收线程在内核态运行的时间。
+
+   real=0.06 secs：表示实际（Wall Clock）时间，即从GC开始到结束的总时间，为0.06秒。
+
 #### Major/Full GC
 
 **老年代GC（MajorGC）触发机制**
@@ -1015,11 +1062,44 @@ Java堆区用于存储Java对象实例，堆的大小在JVM启动时就已经设
 2.  老年代空间不足
 3.  方法区空间不足
 4.  通过Minor GC后进入老年代的平均大小大于老年代的可用内存
-5.  由Eden区、survivor space0（From Space）区向survivor space1（To Space）区复制时，对象大小大于To Space可用内存，则把该对象转存到老年代，且老年代的可用内存小于该对象大小
+5.  由Eden区survivor space0（From Space）区向survivor space1（To Space）区复制时，对象大小大于To Space可用内存，则把该对象转存到老年代，且老年代的可用内存小于该对象大小
 
-说明：Full GC 是开发或调优中尽量要避免的。这样STW时间会短一些
+Full GC是开发或调优中尽量要避免的。这样STW时间会短一些
+
+**TLAB**
+
+Thread Local Allocation Buffer，也就是为每个线程单独分配了一个缓冲区.在堆中划分出一块区域，为每个线程所独占
+
+堆区是线程共享区域，任何线程都可以访问到堆区中的共享数据
+
+由于对象实例的创建在JVM中非常频繁，因此在并发环境下从堆区中划分内存空间是线程不安全的
+
+为避免多个线程操作同一地址，需要使用加锁等机制，进而影响分配速度。
+
+尽管不是所有的对象实例都能够在TLAB中成功分配内存，但JVM确实是**将TLAB作为内存分配的首选**。
+
+一旦对象在TLAB空间分配内存失败时，JVM就会尝试着通过使用加锁机制确保数据操作的原子性，从而直接在Eden空间中分配内存
+
+![TLAB.png](../images/TLAB.png)
+
+**堆是分配对象的唯一选择么？**
+
+不是的。如果经过逃逸分析（Escape Analysis）后发现，一个对象并没有逃逸出方法的话，那么就可能被优化成栈上分配
 
 
+
+**代码优化**
+
+- 栈上分配：将堆分配转化为栈分配。如果一个对象在子程序中被分配，要使指向该对象的指针永远不会发生逃逸，对象可能是栈上分配的候选，而不是堆上分配
+- 逃逸分析
+- 同步省略：如果一个对象被发现只有一个线程被访问到，那么对于这个对象的操作可以不考虑同步。
+- 分离对象或标量替换：有的对象可能不需要作为一个连续的内存结构存在也可以被访问到，那么对象的部分（或全部）可以不存储在内存，而是存储在CPU寄存器中。
+
+**逃逸分析**
+
+如何将堆上的对象分配到*栈*(线程私有)，需要使用逃逸分析手段。
+
+逃逸分析的基本行为就是分析对象动态作用域：当一个对象在方法中被定义后，对象只在方法内部使用，则认为没有发生逃逸
 
 ### 双亲委派
 

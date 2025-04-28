@@ -185,8 +185,20 @@ mysql> select * from tuser where name like '张%' and age=10 and ismale=1;
 
 #### 索引相关问题
 
-### 锁
+### 事务
 
+SQL标准的事务隔离级别包括：
+
+- 读未提交（read uncommitted）: 一个事务还没提交时，它做的变更就能被别的事务看到
+- 读提交（read committed）: 一个事务提交之后，它做的变更才会被其他事务看到
+- 可重复读（repeatable read）: 一个事务执行过程中看到的数据，总是跟这个事务在启动时看到的数据是一致的。当然在可重复读隔离级别下，未提交变更对其他事务也是不可见的
+- 串行化（serializable ）: 对于同一行记录，“写”会加“写锁”，“读”会加“读锁”。当出现读写锁冲突的时候，后访问的事务必须等前一个事务执行完成，才能继续执行
+
+**Example:**
+
+![事务example.png](../images/事务example.png)
+
+### 锁
 - 全局锁
 - 表级锁
 - 行锁
@@ -272,7 +284,24 @@ InnoDB是支持行锁的，这也是MyISAM被InnoDB替代的重要原因之一
 
 ### 优化
 
-#### order语句流程与优化
+#### **更新语句**
+
+1. redo log（重做日志）
+
+    redo log就是mysql的WAL，当有一条记录需要更新的时候，InnoDB就会先把记录写到 redo log里面，并更新内存，这个时候更新就算完成了。
+    同时，InnoDB引擎会在适当的时候，将这个操作记录更新到磁盘里面
+    
+    ![redo_log.png](redo_log.png)
+    
+    > 有了redo log，InnoDB就可以保证即使数据库发生异常重启，之前提交的记录都不会丢失，这个能力称为crash-safe。
+
+2. binlog（归档日志）
+
+为什么会有两份日志呢？
+
+MySQL自带的引擎是MyISAM，但是MyISAM没有crash-safe的能力，binlog日志只能用于归档。
+
+#### **order语句流程与优化**
 
 以下面为例：
 ```SQL
@@ -316,6 +345,29 @@ rowid排序会要求回表多造成磁盘读，因此不会被优先选择。
 
 3. 省去排序环节
 
+从city索引上取出来的行，天然就是按照name递增排序的话，就可以不用再排序了
+
+```SQL
+alter table t add index city_user(city, name);
+```
+
+![联合索引_order.png](../images/联合索引_order.png)
+
+这个查询过程不需要临时表，也不需要排序
+
+**以上的例子还能继续优化：可以用覆盖索引**
+
+```SQL
+alter table t add index city_user_age(city, name, age);
+```
+
+![索引下推_order.png](../images/索引下推_order.png)
+
+explain结果：
+
+![索引下推_order_explain.png](索引下推_order_explain.png)
+
+Extra字段里面多了“Using index”，表示的就是使用了覆盖索引，性能上会快很多
 
 ## Mybatis
 
