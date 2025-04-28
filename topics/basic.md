@@ -1068,7 +1068,7 @@ Full GC是开发或调优中尽量要避免的。这样STW时间会短一些
 
 **TLAB**
 
-Thread Local Allocation Buffer，也就是为每个线程单独分配了一个缓冲区.在堆中划分出一块区域，为每个线程所独占
+Thread Local Allocation Buffer，也就是为每个线程单独分配了一个缓冲区。在堆中划分出一块区域，为每个线程所独占
 
 堆区是线程共享区域，任何线程都可以访问到堆区中的共享数据
 
@@ -1082,24 +1082,94 @@ Thread Local Allocation Buffer，也就是为每个线程单独分配了一个�
 
 ![TLAB.png](../images/TLAB.png)
 
-**堆是分配对象的唯一选择么？**
-
-不是的。如果经过逃逸分析（Escape Analysis）后发现，一个对象并没有逃逸出方法的话，那么就可能被优化成栈上分配
-
-
-
-**代码优化**
-
-- 栈上分配：将堆分配转化为栈分配。如果一个对象在子程序中被分配，要使指向该对象的指针永远不会发生逃逸，对象可能是栈上分配的候选，而不是堆上分配
-- 逃逸分析
-- 同步省略：如果一个对象被发现只有一个线程被访问到，那么对于这个对象的操作可以不考虑同步。
-- 分离对象或标量替换：有的对象可能不需要作为一个连续的内存结构存在也可以被访问到，那么对象的部分（或全部）可以不存储在内存，而是存储在CPU寄存器中。
-
 **逃逸分析**
 
 如何将堆上的对象分配到*栈*(线程私有)，需要使用逃逸分析手段。
 
 逃逸分析的基本行为就是分析对象动态作用域：当一个对象在方法中被定义后，对象只在方法内部使用，则认为没有发生逃逸
+
+*堆是分配对象的唯一选择么？*
+
+不是的。如果经过逃逸分析（Escape Analysis）后发现，一个对象并没有逃逸出方法的话，那么就可能被优化成栈上分配
+
+> 在Java 8中，逃逸分析（Escape Analysis）默认是关闭的。在Java 11中是默认开启的
+
+```Java
+/**
+ * 逃逸分析
+ * 如何快速的判断是否发生了逃逸分析，就看new的对象是否在方法外被调用。
+ */
+public class EscapeAnalysis {
+
+    public EscapeAnalysis obj;
+
+    /**
+     * 方法返回EscapeAnalysis对象，发生逃逸
+     * @return
+     */
+    public EscapeAnalysis getInstance() {
+        return obj == null ? new EscapeAnalysis():obj;
+    }
+
+    /**
+     * 为成员属性赋值，发生逃逸
+     */
+    public void setObj() {
+        this.obj = new EscapeAnalysis();
+    }
+
+    /**
+     * 对象的作用于仅在当前方法中有效，没有发生逃逸
+     */
+    public void useEscapeAnalysis() {
+        EscapeAnalysis e = new EscapeAnalysis();
+    }
+
+    /**
+     * 引用成员变量的值，发生逃逸
+     */
+    public void useEscapeAnalysis2() {
+        EscapeAnalysis e = getInstance();
+        // getInstance().XXX  发生逃逸
+    }
+}
+```
+
+使用逃逸分析，编译器可以对代码做如下**代码优化**：
+- 栈上分配：将堆分配转化为栈分配。如果一个对象在子程序中被分配，要使指向该对象的指针永远不会发生逃逸，对象可能是栈上分配的候选，而不是堆上分配
+- 同步省略：如果一个对象被发现只有一个线程被访问到，那么对于这个对象的操作可以不考虑同步。
+- 分离对象或标量替换：有的对象可能不需要作为一个连续的内存结构存在也可以被访问到，那么对象的部分（或全部）可以不存储在内存，而是存储在CPU寄存器中。
+
+**分离对象和标量替换**
+
+标量（scalar）是指一个无法再分解成更小的数据的数据。Java中的原始数据类型就是标量。
+
+相对的，那些还可以分解的数据叫做聚合量（Aggregate），Java中的对象就是聚合量，因为他可以分解成其他聚合量和标量。
+
+在JIT阶段，如果经过逃逸分析，发现一个对象不会被外界访问的话，那么经过JIT优化，就会把这个对象拆解成若干个其中包含的若干个成员变量来代替。这个过程就是标量替换。
+
+```Java
+public static void main(String args[]) {
+    alloc();
+}
+class Point {
+    private int x;
+    private int y;
+}
+private static void alloc() {
+    Point point = new Point(1,2);
+    System.out.println("point.x" + point.x + ";point.y" + point.y);
+}
+```
+
+以上代码，经过标量替换后，就会变成
+```Java
+private static void alloc() {
+    int x = 1;
+    int y = 2;
+    System.out.println("point.x = " + x + "; point.y=" + y);
+}
+```
 
 ### 双亲委派
 
