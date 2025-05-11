@@ -273,8 +273,16 @@ q来自于Decoder，K,V来自于Encoder
 
 参考雅虎EGADS，实现用于大规模时间序列数据自动化异常检测的通用和可扩展框架
 
+问题：
+1. 主要解决了什么问题？架构如何
+2. 如何提升指标？
+3. 有哪些指标来衡量？
 
-各种用例中可以提高50-60%的精确度和召回率 ？？
+Current state of the art anomaly detection approaches suffer from **scalability, use-case restrictions, difficulty of use and a large number of false positives**.
+
+uses a collection of anomaly detection and forecasting models with an anomaly filtering layer for accurate and scalable anomaly detection on time-series.
+
+各种用例中可以提高50-60%的精确度和召回率? **如何提高的**
 
 将预测、异常检测和告警分为三个独立组件，允许用户在任何组件中添加自己的模型。需要注意的是，本文重点讨论后两个组件。
 
@@ -296,8 +304,8 @@ q来自于Decoder，K,V来自于Encoder
 - 告警路由系统应用路由配置规则，将告警发送给适当的支援人员。
 
 异常检测算法能够检测以下三类异常：
-1. 离群点(Outliers)：给定输入时间序列x，离群点是时间戳-值对$⟨t, xt⟩$，其中观测值xt与该时间的预期值$E(xt)$显著不同。
-2. 变化点(Change points)：给定输入时间序列x，变化点是时间戳$t$，使得时间序列在$t$之前和之后的行为显著不同。
+1. 离群点(Outliers)：给定输入时间序列$x$，离群点是时间戳-值对$⟨t, xt⟩$，其中观测值xt与该时间的预期值$E(xt)$显著不同。
+2. 变化点(Change points)：给定输入时间序列$x$，变化点是时间戳$t$，使得时间序列在$t$之前和之后的行为显著不同。
 3. 异常时间序列(Anomalous time-series)：给定一组时间序列$X = \{x^i\}$，异常时间序列$x^j ∈ X$是其行为与X中的大多数时间序列显著不同的时间序列。
 
 

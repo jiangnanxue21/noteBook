@@ -7,11 +7,11 @@
 问题:
 1. 如果表 T 中没有字段 k，而你执行了这个语句 select * from T where k=1, 那肯定是会报“不存在这个列”的错误： “Unknown column ‘k’ in ‘where clause’”。你觉得这个错误是在我们上面提到的哪个阶段报出来的呢？
 
-答：分析器
+   答：分析器
 
 2. 判断一下你对这个表 T 有没有执行查询的权限是在哪个阶段？
 
-答：有些时候，SQL语句要操作的表不只是SQL字面上那些。比如如果有个触发器，得在执行器阶段（过程中）才能确定。优化器阶段前是无能为力的
+   答：有些时候，SQL语句要操作的表不只是SQL字面上那些。比如如果有个触发器，得在执行器阶段（过程中）才能确定。优化器阶段前是无能为力的
 
 总结一下在评论中看到的问题的解答
 1. 连接器是从权限表里边查询用户权限并保存在一个变量里边以供查询缓存，分析器，执行器在检查权限的时候使用。
@@ -22,12 +22,14 @@
 6. wait_timeout是非交互式连接的空闲超时，interactive_timeout是交互式连接的空闲超时。执行时间不计入空闲时间。这两个超时设置得是否一样要看情况。
 
 ### 高级应用
+
 - 视图
 - 存储过程
 - 游标
 - 触发器
 
 #### 视图
+
 重用SQL语句。
 - 简化复杂的SQL操作。在编写查询后，可以方便地重用它而不必知道它的基本查询细节。
 - 使用表的组成部分而不是整个表。
@@ -38,7 +40,8 @@
 MySQL视图（View）是一种虚拟表，它是基于SQL语句的结果集创建的。
 视图可以包含多个表中的列，也可以包含计算字段。视图的主要作用是简化复杂的查询，使得查询更加直观和容易理解。
 
-以下是一些常见的 MySQL 视图面试题：
+以下是一些常见的MySQL视图面试题：
+
 1. **视图的优缺点是什么？**
     - **优点：**
         - 提供了一种方法来简化复杂的查询。
@@ -82,10 +85,7 @@ MySQL视图（View）是一种虚拟表，它是基于SQL语句的结果集创�
     - 视图不能包含生成列（GENERATED COLUMNS）。
 
 8. **如何删除视图？**
-    - 使用 `DROP VIEW` 语句删除视图：
-    ```sql
-    DROP VIEW view_name;
-    ```
+    使用 `DROP VIEW` 语句删除视图：
 
 9. **视图可以跨数据库吗？**
     - 是的，视图可以跨数据库。
@@ -94,6 +94,32 @@ MySQL视图（View）是一种虚拟表，它是基于SQL语句的结果集创�
     - 视图可以包含大部分 SQL 函数，但有些函数（如随机数生成函数）可能不被支持。
 
 #### 存储过程
+
+一、提高性能方面
+
+- 减少网络通信
+   当需要对数据库进行一系列复杂的操作时，比如在电商系统中，用户下单后需要同时更新库存表、订单表、支付状态表等多个表。如果这些操作通过应用程序逐条发送SQL语句到数据库，每条SQL语句的执行都需要一次网络通信。而使用存储过程，可以将这些操作封装在存储过程内部，在数据库服务器端一次性执行，大大减少了网络通信次数，从而提高了系统的性能。
+
+- 预编译优势
+
+   存储过程在第一次被调用时，数据库会对其进行语法检查、优化并生成执行计划。之后每次调用存储过程时，数据库可以直接使用这个预先编译好的执行计划。例如，在一个数据仓库环境中，经常需要对海量数据进行复杂的查询和聚合操作。使用存储过程可以避免每次查询都重新编译SQL语句，利用预编译的执行计划快速执行，提高查询效率。
+
+- 批量操作
+
+   对于大量数据的插入、更新或删除操作，存储过程可以更高效地处理。例如，在一个企业资源规划（ERP）系统中，需要批量导入员工的考勤数据。通过存储过程可以一次处理多个数据记录，而不是逐条发送SQL语句，这样可以减少数据库的I/O操作，提高数据处理的速度。
+
+二、增强安全性方面
+
+- 限制用户对数据的直接访问
+
+   可以通过存储过程来控制用户对数据库表的访问权限。例如，在一个银行系统中，普通柜员用户不能直接访问客户账户余额表，而是通过调用存储过程来查询余额。存储过程可以对用户输入进行严格的验证，防止用户执行非法操作，如直接修改账户余额等。这样可以避免用户直接对数据库表进行操作可能带来的安全风险，如SQL注入攻击等。
+
+- 实现复杂的业务逻辑安全验证
+
+   当业务逻辑比较复杂时，存储过程可以在数据库层面进行安全验证。以一个在线教育平台为例，学生提交作业后，需要验证作业是否符合课程要求、是否在截止日期之前提交等多种条件。这些复杂的验证逻辑可以在存储过程中实现，确保只有符合所有安全和业务规则的操作才能对数据库进行修改，从而保护数据的完整性和安全性。
+
+*感觉存储过程可以类比成函数？*
+
 #### 游标
 #### 触发器
 
@@ -337,37 +363,38 @@ select city,name,age from t where city='杭州' order by name limit 1000  ;
 
    ![rowid排序.png](../images/rowid排序.png)
 
-如果MySQL认为内存足够大，会优先选择全字段排序，把需要的字段都放到sort_buffer中，这样排序后就会直接从内存里面返回查询结果了，不用再回到原表去取数据。
-
-rowid排序会要求回表多造成磁盘读，因此不会被优先选择。
-
-**设计思想：如果内存够，就要多利用内存，尽量减少磁盘访问。**
+   如果MySQL认为内存足够大，会优先选择全字段排序，把需要的字段都放到sort_buffer中，这样排序后就会直接从内存里面返回查询结果了，不用再回到原表去取数据。
+   
+   rowid排序会要求回表多造成磁盘读，因此不会被优先选择。
+   
+   **设计思想：如果内存够，就要多利用内存，尽量减少磁盘访问。**
 
 3. 省去排序环节
 
-从city索引上取出来的行，天然就是按照name递增排序的话，就可以不用再排序了
+   从city索引上取出来的行，天然就是按照name递增排序的话，就可以不用再排序了
+   
+   ```SQL
+   alter table t add index city_user(city, name);
+   ```
+   
+   ![联合索引_order.png](../images/联合索引_order.png)
+   
+   这个查询过程不需要临时表，也不需要排序
+   
+   **以上的例子还能继续优化：可以用覆盖索引**
+   
+   ```SQL
+   alter table t add index city_user_age(city, name, age);
+   ```
+   
+   ![索引下推_order.png](../images/索引下推_order.png)
+   
+   explain结果：
+   
+   ![索引下推_order_explain.png](../images/索引下推_order_explain.png)
+   
+   Extra字段里面多了“Using index”，表示的就是使用了覆盖索引，性能上会快很多
 
-```SQL
-alter table t add index city_user(city, name);
-```
-
-![联合索引_order.png](../images/联合索引_order.png)
-
-这个查询过程不需要临时表，也不需要排序
-
-**以上的例子还能继续优化：可以用覆盖索引**
-
-```SQL
-alter table t add index city_user_age(city, name, age);
-```
-
-![索引下推_order.png](../images/索引下推_order.png)
-
-explain结果：
-
-![索引下推_order_explain.png](../images/索引下推_order_explain.png)
-
-Extra字段里面多了“Using index”，表示的就是使用了覆盖索引，性能上会快很多
 
 ## Mybatis
 
@@ -457,6 +484,65 @@ public enum LocalCacheScope {
     </settings>
 
 ```
+
+### 动态SQL
+
+#### SqlNode&SqlSource
+
+映射配置文件中定义的SQL节点会被解析成MappedStatement对象，其中的SQL语句会被解析成SqlSource对象，SQL语句中定义的动态SQL节点、文本节点等，则由SqlNode接口的相应实现表示
+
+调用BoundSql的例子：
+```Java
+public <E> List<E> query(MappedStatement ms, Object parameter, RowBounds rowBounds, ResultHandler resultHandler)
+   throws SQLException {
+ BoundSql boundSql = ms.getBoundSql(parameter);
+ CacheKey key = createCacheKey(ms, parameter, rowBounds, boundSql);
+ return query(ms, parameter, rowBounds, resultHandler, key, boundSql);
+}
+```
+
+BoundSql.java
+```Java
+// 从 {@link SqlSource} 获取的实际SQL字符串，经过动态内容处理后生成。该 SQL 可能包含 SQL 占位符 "?"，
+// 以及一个有序的参数映射列表，其中每个参数都包含额外的信息（至少包括输入对象中用于读取值的属性名称）
+public class BoundSql {
+    private final String sql; // 可执行的sql语句
+    private final List<ParameterMapping> parameterMappings; // sql语句的问号，通过这个解析
+    private final Object parameterObject; // 最原始参数
+    private final Map<String, Object> additionalParameters; // 原始参数脚本运算之后的新的参数，比如数组打散和一个？进行对应
+    private final MetaObject metaParameters; // 操作parameterObject这个属性的
+}
+```
+
+**动态SQL主流程解析**
+
+动态SQL定义：每次执行SQL时，基于预先编写的脚本和参数动态的构建可执行Sql语句
+
+![构建可执行SQL.png](../images/构建可执行SQL.png)
+
+StaticSqlSource只是用来存储和映射，已经解析好的
+
+![sqlSource的类关系.png](../images/sqlSource的类关系.png)
+
+RawSqlSource就是把#里面的值转换成？
+
+DynamicSqlSource解析流程：
+
+![DynamicSqlSource.png](../images/DynamicSqlSource.png)
+
+
+SqlNode语法树结构
+
+![sqlNode语法树结构.png](../images/sqlNode语法树结构.png)
+
+**If与Where执行过程分析**
+
+
+### Configuration
+
+![configuration.png](../images/configuration.png)
+
+
 
 <seealso>
     <category ref="wrs">

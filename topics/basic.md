@@ -277,7 +277,7 @@ public class SecurityTransporter extends Transporter {
    @Override
    public Response sendRequest(Request request) {
       if (StringUtils.isBlank(appId) || StringUtils.isBlank(appToken)) {
-         throw new NoAuthorizationRuntimeException(...);
+         throw new NoAuthorizationRuntimeException();
       }
       request.addPayload("app-id", appId);
       request.addPayload("app-token", appToken);
@@ -524,6 +524,13 @@ private class Itr implements Iterator<E> {
 ### 结构型
 
 主要总结了一些类或对象组合在一起的经典结构，这些经典的结构可以解决特定应用场景的问题
+
+#### 组合模式（Composite Design Pattern）
+
+主要是用来处理树形结构数据。正因为其应用场景的特殊性，数据必须能表示成树形结构，这也导致了这种模式在实际的项目开发中并不那么常用。但是，一旦数据满足树形结构，应用这种模式就能发挥很大的作用，能让代码变得非常简洁。
+
+
+
 
 #### 代理模式
 
@@ -1192,6 +1199,8 @@ private static void alloc() {
     System.out.println("point.x = " + x + "; point.y=" + y);
 }
 ```
+
+### 3.4 垃圾回收
 
 ### 双亲委派
 
