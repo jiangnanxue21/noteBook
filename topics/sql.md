@@ -396,6 +396,44 @@ select city,name,age from t where city='杭州' order by name limit 1000  ;
    Extra字段里面多了“Using index”，表示的就是使用了覆盖索引，性能上会快很多
 
 
+#### **join语句流程与优化**
+
+1. 使用join有什么问题呢？
+2. 果有两个大小不同的表做join，应该用哪个表做驱动表呢？
+
+创建如下语句：t1有100行数据，t2有1000
+```SQL
+CREATE TABLE `t2` (
+  `id` int(11) NOT NULL,
+  `a` int(11) DEFAULT NULL,
+  `b` int(11) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `a` (`a`)
+) ENGINE=InnoDB;
+
+create table t1 like t2;
+insert into t1 (select * from t2 where id<=100)
+```
+
+**Index Nested-Loop Join(NLJ)**
+
+straight_join让MySQL使用固定的连接方式执行查询，这样优化器只会按照指定的方式去join。
+t1是驱动表，t2是被驱动表
+```SQL
+select * from t1 straight_join t2 on (t1.a=t2.a);
+```
+
+使用索引字段join的explain结果:
+
+![join_explain_1.png](../images/join_explain_1.png)
+
+被驱动表t2的字段a上有索引，join过程用上了这个索引。这个过程是先遍历表t1，然后根据从表t1中取出的每行数据中的a值，去表t2中查找满足条件的记录
+
+![nested_join.png](../images/nested_join.png)
+
+**驱动表是走全表扫描，而被驱动表是走树搜索**
+
+
 ## Mybatis
 
 ### BaseExecutor
