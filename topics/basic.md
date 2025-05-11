@@ -932,10 +932,14 @@ private static class IntegerCache {
 
 **方法区主要存放的是Class，而堆中主要存放的是实例化的对象，方法区又称为非堆**
 
+《Java虚拟机规范》中明确说明：尽管所有的方法区在逻辑上是属于堆的一部分，但一些简单的实现可能不会选择去进行垃圾收集或者进行压缩。但对于HotSpotJVM而言，方法区还有一个别名叫做Non-Heap（非堆），目的就是要和堆分开。
+
+所以，*方法区可以看作是一块独立于Java堆的内存空间*
+
+
 ![方法区.png](../images/方法区.png)
 
-涉及了对象的访问定位
-
+涉及了对象的访问定位：
 1. Person类的 .class信息存放在方法区中
 2. person变量存放在 Java栈的局部变量表中
 3. 真正person对象存放在Java堆中
@@ -946,6 +950,8 @@ private static class IntegerCache {
 - 加载大量的第三方的jar包
 - Tomcat部署的工程过多（30~50个）
 - 大量动态的生成反射类
+
+![方法区7和8的不同.png](../images/方法区7和8的不同.png)
 
 
 ### 3.2 堆

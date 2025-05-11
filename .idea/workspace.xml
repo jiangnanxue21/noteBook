@@ -4,10 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="f4904cd4-1e73-4808-90e5-c91a890ae80b" name="Changes" comment="sql AND JVM">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/topics/basic.md" beforeDir="false" afterPath="$PROJECT_DIR$/topics/basic.md" afterDir="false" />
-    </list>
+    <list default="true" id="f4904cd4-1e73-4808-90e5-c91a890ae80b" name="Changes" comment="JVM 方法区部分" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -179,7 +176,7 @@
       <workItem from="1743732342622" duration="1128000" />
       <workItem from="1743738565502" duration="46257000" />
       <workItem from="1745588742138" duration="10341000" />
-      <workItem from="1745834054545" duration="295000" />
+      <workItem from="1745834054545" duration="2874000" />
     </task>
     <task id="LOCAL-00001" summary="kafka更新">
       <option name="closed" value="true" />
@@ -221,7 +218,23 @@
       <option name="project" value="LOCAL" />
       <updated>1745817788905</updated>
     </task>
-    <option name="localTasksCounter" value="6" />
+    <task id="LOCAL-00006" summary="JVM堆">
+      <option name="closed" value="true" />
+      <created>1745835672585</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1745835672585</updated>
+    </task>
+    <task id="LOCAL-00007" summary="JVM 方法区部分">
+      <option name="closed" value="true" />
+      <created>1745837037535</created>
+      <option name="number" value="00007" />
+      <option name="presentableId" value="LOCAL-00007" />
+      <option name="project" value="LOCAL" />
+      <updated>1745837037535</updated>
+    </task>
+    <option name="localTasksCounter" value="8" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -232,7 +245,9 @@
     <MESSAGE value="sql和jvm部分" />
     <MESSAGE value="sql行索" />
     <MESSAGE value="sql AND JVM" />
-    <option name="LAST_COMMIT_MESSAGE" value="sql AND JVM" />
+    <MESSAGE value="JVM堆" />
+    <MESSAGE value="JVM 方法区部分" />
+    <option name="LAST_COMMIT_MESSAGE" value="JVM 方法区部分" />
   </component>
   <component name="XSLT-Support.FileAssociations.UIState">
     <expand />
