@@ -943,7 +943,6 @@ private static class IntegerCache {
 
 所以，*方法区可以看作是一块独立于Java堆的内存空间*
 
-
 ![方法区.png](../images/方法区.png)
 
 涉及了对象的访问定位：
