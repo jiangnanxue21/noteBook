@@ -935,13 +935,15 @@ private static class IntegerCache {
 
 ### 3.1 方法区
 
-栈、堆、方法区的交互关系
+方法区(Method Area)与Java堆一样，是各个线程共享的内存区域，它用于存储已被虚拟机加载的类型信息、常量、静态变量、即时编译器编译后的代码缓存等数据。
 
-**方法区主要存放的是Class，而堆中主要存放的是实例化的对象，方法区又称为非堆**
-
-《Java虚拟机规范》中明确说明：尽管所有的方法区在逻辑上是属于堆的一部分，但一些简单的实现可能不会选择去进行垃圾收集或者进行压缩。但对于HotSpotJVM而言，方法区还有一个别名叫做Non-Heap（非堆），目的就是要和堆分开。
+虽然《Java虚拟机规范》中把方法区描述为堆的一个逻辑部分，但是它却有一个别名叫作**“非堆”(Non-Heap)**，目的是与Java堆区分开来。
 
 所以，*方法区可以看作是一块独立于Java堆的内存空间*
+
+栈、堆、方法区的交互关系
+
+**方法区主要存放的是Class，而堆中主要存放的是实例化的对象**
 
 ![方法区.png](../images/方法区.png)
 
@@ -959,6 +961,61 @@ private static class IntegerCache {
 
 ![方法区7和8的不同.png](../images/方法区7和8的不同.png)
 
+non-final 类型的类变量
+- 静态变量和类关联在一起，随着类的加载而加载，他们成为类数据在逻辑上的一部分
+- 类变量被类的所有实例共享，即使没有类实例时，也可以访问
+
+以下表明了static类型的字段和方法随着类的加载而加载，并不属于特定的类实例
+```Java
+public class MethodInnerStrucTest extends Object implements Comparable<String>, Serializable {
+    //属性
+    public static final int num = 10;
+    private static String str = "测试方法的内部结构";
+
+    public static void main(String[] args) {
+        MethodInnerStrucTest test = null;
+        System.out.println(test.str);
+    }
+}
+```
+
+输出结果：
+```Text
+测试方法的内部结构
+```
+
+全局常量：static final
+- 全局常量就是使用 static final 进行修饰
+- 被声明为final的类变量的处理方法则不同，每个全局常量在编译的时候就会被分配了。
+
+```Text
+public static final int num;
+descriptor: I
+flags: (0x0019) ACC_PUBLIC, ACC_STATIC, ACC_FINAL
+ConstantValue: int 10
+
+private static java.lang.String str;
+descriptor: Ljava/lang/String;
+flags: (0x000a) ACC_PRIVATE, ACC_STATIC
+```
+staitc和final同时修饰的number的值在编译上的时候已经写死在字节码文件中
+
+#### 运行时常量池
+![运行时常量池.png](../images/运行时常量池.png)
+
+1. 方法区，内部包含了运行时常量池
+2. 字节码文件，内部包含了常量池。很多Constant pool的东西，这个就是常量池
+要弄清楚方法区，需要理解清楚ClassFile，因为加载类的信息都在方法区。
+要弄清楚方法区的运行时常量池，需要理解清楚ClassFile中的常量池。
+
+```Text
+Constant pool:
+   #1 = Methodref          #2.#3          // java/lang/Object."<init>":()V
+   #2 = Class              #4             // java/lang/Object
+   #3 = NameAndType        #5:#6          // "<init>":()V
+   #4 = Utf8               java/lang/Object
+   #5 = Utf8               <init>
+```
 
 ### 3.2 堆
 
