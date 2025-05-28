@@ -4,16 +4,13 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="f4904cd4-1e73-4808-90e5-c91a890ae80b" name="Changes" comment="kafka更新">
-      <change afterPath="$PROJECT_DIR$/images/DynamicSqlSource.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/images/configuration.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/images/sqlNode语法树结构.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/images/sqlSource的类关系.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/images/构建可执行SQL.png" afterDir="false" />
+    <list default="true" id="f4904cd4-1e73-4808-90e5-c91a890ae80b" name="Changes" comment="sql更新">
+      <change afterPath="$PROJECT_DIR$/images/内存淘汰策略.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/images/只读缓存.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/images/外因.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/images/读写缓存.png" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/topics/AI.md" beforeDir="false" afterPath="$PROJECT_DIR$/topics/AI.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/topics/basic.md" beforeDir="false" afterPath="$PROJECT_DIR$/topics/basic.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/topics/sql.md" beforeDir="false" afterPath="$PROJECT_DIR$/topics/sql.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/topics/redis.md" beforeDir="false" afterPath="$PROJECT_DIR$/topics/redis.md" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -149,21 +146,6 @@
   &quot;keyToStringList&quot;: {
     &quot;DatabaseDriversLRU&quot;: [
       &quot;mysql&quot;
-    ],
-    &quot;stardust.markdown.MarkdownSplitEditorSuppressor:keyList&quot;: [
-      &quot;D:/source code/Writerside/topics/AI.md&quot;,
-      &quot;D:/source code/Writerside/topics/DDIA.md&quot;,
-      &quot;D:/source code/Writerside/topics/JUC.md&quot;,
-      &quot;D:/source code/Writerside/topics/Scala.md&quot;,
-      &quot;D:/source code/Writerside/topics/basic.md&quot;,
-      &quot;D:/source code/Writerside/topics/elasticsearch.md&quot;,
-      &quot;D:/source code/Writerside/topics/hadoop.md&quot;,
-      &quot;D:/source code/Writerside/topics/kafka.md&quot;,
-      &quot;D:/source code/Writerside/topics/mybatis.md&quot;,
-      &quot;D:/source code/Writerside/topics/netty.md&quot;,
-      &quot;D:/source code/Writerside/topics/redis.md&quot;,
-      &quot;D:/source code/Writerside/topics/spring.md&quot;,
-      &quot;D:/source code/Writerside/topics/sql.md&quot;
     ]
   }
 }</component>
@@ -181,6 +163,9 @@
     </attachedChunks>
   </component>
   <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
+  <component name="StructureViewState">
+    <option name="selectedTab" value="逻辑" />
+  </component>
   <component name="TaskManager">
     <task active="true" id="Default" summary="Default task">
       <changelist id="f4904cd4-1e73-4808-90e5-c91a890ae80b" name="Changes" comment="" />
@@ -195,7 +180,10 @@
       <workItem from="1743738565502" duration="46257000" />
       <workItem from="1746062092181" duration="20225000" />
       <workItem from="1746859428229" duration="3114000" />
-      <workItem from="1746938764046" duration="3677000" />
+      <workItem from="1746938764046" duration="5094000" />
+      <workItem from="1747535651779" duration="1334000" />
+      <workItem from="1747537637074" duration="1635000" />
+      <workItem from="1748427546787" duration="7505000" />
     </task>
     <task id="LOCAL-00001" summary="kafka更新">
       <option name="closed" value="true" />
@@ -213,7 +201,23 @@
       <option name="project" value="LOCAL" />
       <updated>1743946385598</updated>
     </task>
-    <option name="localTasksCounter" value="3" />
+    <task id="LOCAL-00003" summary="sql更新">
+      <option name="closed" value="true" />
+      <created>1746967967027</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1746967967027</updated>
+    </task>
+    <task id="LOCAL-00004" summary="sql更新">
+      <option name="closed" value="true" />
+      <created>1746968204262</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1746968204262</updated>
+    </task>
+    <option name="localTasksCounter" value="5" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -221,6 +225,7 @@
   </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="kafka更新" />
-    <option name="LAST_COMMIT_MESSAGE" value="kafka更新" />
+    <MESSAGE value="sql更新" />
+    <option name="LAST_COMMIT_MESSAGE" value="sql更新" />
   </component>
 </project>
