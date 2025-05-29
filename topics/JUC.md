@@ -1069,8 +1069,168 @@ completableFuture.thenRun(() -> System.out.println(1));
 
 ### AQS
 
-![juc.png](../images/juc.png)
+![juc](../images/juc.png)
 
-### 并发容器
+## 并发容器
 
 ![](../images/blockingQueue.png)
+
+
+### ConcurrentHashMap
+
+CAS：在没有hash冲突时（Node要放在数组上时）
+
+synchronized：在出现hash冲突时（Node存放的位置已经有数据了）
+
+存储的结构：数组+链表+红黑树
+
+#### 1.2 存储操作
+
+**1.2.1 put方法**
+
+```java
+public V put(K key, V value) {
+    // 在调用put方法时，会调用putVal，第三个参数默认传递为false
+    // 在调用putIfAbsent时，会调用putVal方法，第三个参数传递的为true
+    // 如果传递为false，代表key一致时，直接覆盖数据
+    // 如果传递为true，代表key一致时，什么都不做，key不存在，正常添加（Redis，setnx）
+    return putVal(key, value, false);
+}
+```
+
+```Java
+public static void test() {
+    Map<String, String> queue = new ConcurrentHashMap<>();
+    queue.put("1", "1");
+    System.out.println(queue.put("1", "3")); // 1
+    System.out.println(queue); // {1=3}
+    queue.putIfAbsent("3", "3");
+    System.out.println(queue.putIfAbsent("3", "4"));// 3
+    System.out.println(queue);// {1=3, 3=3}
+}
+```
+
+**1.2.2 putVal方法-散列算法**
+
+```java
+final V putVal(K key, V value, boolean onlyIfAbsent) {
+    // ConcurrentHashMap不允许key或者value出现为null的值，跟HashMap的区别
+    if (key == null || value == null) throw new NullPointerException();
+    // 根据key的hashCode计算出一个hash值，后期得出当前key-value要存储在哪个数组索引位置
+    int hash = spread(key.hashCode());
+    // 一个标识，在后面有用！
+    int binCount = 0;
+    // 省略大量的代码……
+}
+
+// 计算当前Node的hash值的方法
+static final int spread(int h) {
+    // 将key的hashCode值的高低16位进行^运算，最终又与HASH_BITS进行了&运算
+    // 将高位的hash也参与到计算索引位置的运算当中
+    // 为什么HashMap、ConcurrentHashMap，都要求数组长度为2^n
+    // HASH_BITS让hash值的最高位符号位肯定为0，代表当前hash值默认情况下一定是正数，因为hash值为负数时，有特殊的含义
+    // static final int MOVED     = -1; // 代表当前hash位置的数据正在扩容！
+    // static final int TREEBIN   = -2; // 代表当前hash位置下挂载的是一个红黑树
+    // static final int RESERVED  = -3; // 预留当前索引位置……
+    return (h ^ (h >>> 16)) & HASH_BITS;
+    // 计算数组放到哪个索引位置的方法   (f = tabAt(tab, i = (n - 1) & hash)
+    // n：是数组的长度
+}
+```
+
+```Text
+00001101 00001101 00101111 10001111  - h = key.hashCode
+
+运算方式
+00000000 00000000 00000000 00001111  - 15 (n - 1)
+&
+(
+(
+00001101 00001101 00101111 10001111  - h
+^
+00000000 00000000 00001101 00001101  - h >>> 16 // 高16位
+)
+&
+01111111 11111111 11111111 11111111  - HASH_BITS // 首位是0
+)
+```
+
+**1.2.3 putVal方法-添加数据到数组&初始化数组**
+
+```java
+final V putVal(K key, V value, boolean onlyIfAbsent) {
+    // 省略部分代码…………
+    // 将Map的数组赋值给tab，死循环
+    for (Node<K,V>[] tab = table;;) {
+        // 声明了一堆变量~~
+        // n:数组长度
+        // i:当前Node需要存放的索引位置
+        // f: 当前数组i索引位置的Node对象
+        // fn：当前数组i索引位置上数据的hash值
+        Node<K,V> f; int n, i, fh;
+        // 判断当前数组是否还没有初始化
+        if (tab == null || (n = tab.length) == 0)
+            // 将数组进行初始化。
+            tab = initTable();
+        // 基于 (n - 1) & hash 计算出当前Node需要存放在哪个索引位置
+        // 基于tabAt获取到i位置的数据
+        else if ((f = tabAt(tab, i = (n - 1) & hash)) == null) {
+            // 现在数组的i位置上没有数据，基于CAS的方式将数据存在i位置上
+            if (casTabAt(tab, i, null,new Node<K,V>(hash, key, value, null)))
+                // 如果成功，执行break跳出循环，插入数据成功
+                break;   
+        }
+        // 判断当前位置数据是否正在扩容……
+        else if ((fh = f.hash) == MOVED)
+            // 让当前插入数据的线程协助扩容
+            tab = helpTransfer(tab, f);
+        // 省略部分代码…………
+    }
+    // 省略部分代码…………
+}
+```
+
+两个同时初始化的时候如何保证线程安全
+sizeCtl：是数组在初始化和扩容操作时的一个控制变量
+-1：代表当前数组正在初始化
+小于-1：低16位代表当前数组正在扩容的线程个数（如果1个线程扩容，值为-2，如果2个线程扩容，值为-3）
+0：代表数组还没初始化
+大于0：代表当前数组的扩容阈值，或者是当前数组的初始化大小
+```Java
+// 初始化数组方法
+private final Node<K,V>[] initTable() {
+    // 声明标识
+    Node<K,V>[] tab; int sc;
+    // 再次判断数组没有初始化，并且完成tab的赋值
+    while ((tab = table) == null || tab.length == 0) {
+        // 将sizeCtl赋值给sc变量，并判断是否小于0
+        if ((sc = sizeCtl) < 0)
+            Thread.yield(); 
+        // 可以尝试初始化数组，线程会以CAS的方式，将sizeCtl修改为-1，代表当前线程可以初始化数组
+        else if (U.compareAndSwapInt(this, SIZECTL, sc, -1)) {
+            // 尝试初始化！
+            try {
+                // 再次判断当前数组是否已经初始化完毕。
+                if ((tab = table) == null || tab.length == 0) {
+                    // 开始初始化，
+                    // 如果sizeCtl > 0，就初始化sizeCtl长度的数组
+                    // 如果sizeCtl == 0，就初始化默认的长度
+                    int n = (sc > 0) ? sc : DEFAULT_CAPACITY;
+                    // 初始化数组！
+                    Node<K,V>[] nt = (Node<K,V>[])new Node<?,?>[n];
+                    // 将初始化的数组nt，赋值给tab和table
+                    table = tab = nt;
+                    // sc赋值为了数组长度 - 数组长度 右移 2位    16 - 4 = 12
+                    // 将sc赋值为下次扩容的阈值
+                    sc = n - (n >>> 2);
+                }
+            } finally {
+                // 将赋值好的sc，设置给sizeCtl
+                sizeCtl = sc;
+            }
+            break;
+        }
+    }
+    return tab;
+}
+```

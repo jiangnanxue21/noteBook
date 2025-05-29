@@ -220,7 +220,7 @@ SQL标准的事务隔离级别包括：
 
 **Example:**
 
-![事务example.png](../images/事务example.png)
+![事务example](../images/事务example.png)
 
 不同事务隔离级别的值也是不同的：
 - read uncommitted：
@@ -261,7 +261,7 @@ SQL标准的事务隔离级别包括：
 
 读写锁之间、写锁之间是互斥的，用来保证变更表结构操作的安全性。因此，如果有两个线程要同时给一个表加字段，其中一个要等另一个执行完才能开始执行。
 
-![mdl.png](../images/mdl.png)
+![mdl](../images/mdl.png)
 
 写锁没有释放之前，这个表现在完全不可读写了
 
@@ -282,11 +282,11 @@ InnoDB是支持行锁的，这也是MyISAM被InnoDB替代的重要原因之一
 
 在InnoDB事务中，行锁是在需要的时候才加上的，但并不是不需要了就立刻释放，而是要等到事务结束时才释放
 
-![两阶段锁.png](../images/两阶段锁.png)
+![两阶段锁](../images/两阶段锁.png)
 
 **死锁**
 
-![死锁.png](../images/死锁.png)
+![死锁](../images/死锁.png)
 
 死锁检测：
 1. 直接进入等待，直到超时。这个超时时间可以通过参数innodb_lock_wait_timeout来设置，但是时间不好设置
