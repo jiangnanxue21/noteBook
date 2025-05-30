@@ -19,7 +19,7 @@
     <toc-element topic="数据结构.md"/>
     <toc-element topic="分布式.md"/>
     <toc-element topic="HBase.md"/>
-    <toc-element topic="redis.md"/>
+    <toc-element topic="缓存.md"/>
     <toc-element topic="hadoop.md"/>
     <toc-element topic="spring.md"/>
     <toc-element topic="Spark.md"/>
