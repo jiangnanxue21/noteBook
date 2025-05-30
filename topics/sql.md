@@ -1,6 +1,6 @@
 # SQL
 
-## MySQL
+## 1. MySQL
 
 ![](../images/Mysql架构图.png)
 
@@ -434,7 +434,7 @@ select * from t1 straight_join t2 on (t1.a=t2.a);
 **驱动表是走全表扫描，而被驱动表是走树搜索**
 
 
-## Mybatis
+## 2. Mybatis
 
 ### BaseExecutor
 
@@ -584,19 +584,9 @@ SqlNode语法树结构
 
 <seealso>
     <category ref="wrs">
-        <a href="https://plugins.jetbrains.com/plugin/20158-writerside/docs/markup-reference.html">Markup reference</a>
-        <a href="https://plugins.jetbrains.com/plugin/20158-writerside/docs/manage-table-of-contents.html">Reorder topics in the TOC</a>
-        <a href="https://plugins.jetbrains.com/plugin/20158-writerside/docs/local-build.html">Build and publish</a>
         <a href="https://plugins.jetbrains.com/plugin/20158-writerside/docs/configure-search.html">Configure Search</a>
     </category>
 </seealso>
-
-
-Netty特性:
-1. 异步事件驱动( asynchronous event-driven )
-2. 可维护性(maintainable)
-3. 高性能协议服务器和客户端构建(high performance protocol servers & clients)
-
 
 专题1： 字符串匹配，高亮
 专题2： FST，向量
