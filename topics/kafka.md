@@ -63,7 +63,7 @@ Lambda架构有一个显著的缺点，也就是什么事情都需要做两遍
 
 Kafka还没有成熟的时候，把数据分成批处理层和实时处理层是很难避免的。主要问题在于，我们重放实时处理层的日志是个开销很大的动作
 
-![kappa架构.png](../images/kappa架构.png)
+![kappa架构](../images/kappa架构.png)
 
 相比于Lambda架构，Kappa架构去掉了Lambda 架构的批处理层，而是在**实时处理层，支持了多个视图版本**
 
@@ -79,7 +79,7 @@ Kafka还没有成熟的时候，把数据分成批处理层和实时处理层是
 
 生产者客户端的整体架构，如下所示：
 
-![procuder.png](../images/producer.png)
+![procuder](../images/producer.png)
 
 从以下几个方面来看它的实现： 
 - 数据分区分配策略 
@@ -163,7 +163,7 @@ Example:
 
 RecordAccumulator主要用来缓存消息以便Sender线程可以批量发送，进而减少网络传输的资源消耗以提升性能
 
-![RecodeAccumulator.png](../images/RecodeAccumulator.png)
+![RecodeAccumulator](../images/RecodeAccumulator.png)
 
 什么条件可以发送数据？
 
@@ -271,11 +271,11 @@ leastLoadedNode，即所有Node中负载最小的那一个，如何确定负载�
 
 **client网络层**
 
-![client元数据更新.png](../images/client元数据更新.png)
+![client元数据更新](../images/client元数据更新.png)
 
 wakeup()方法用于唤醒在select()或select(long)方法调用中被阻塞的线程。当selector上的channel无就绪事件时，如果想要唤醒阻塞在select()操作上的线程去处理一些别的工作，可以调用wakeup()方法
 
-![wakeup.png](../images/wakeup.png)
+![wakeup](../images/wakeup.png)
 
 多路复用器获取的是**事件**而不是读取数据, read的情况下首先产生的是事件，然后selector再处理
 
@@ -314,7 +314,7 @@ https://blog.csdn.net/qq_33204709/article/details/137098027
 
 整体架构:
 
-![SocketServer.png](SocketServer.png)
+![SocketServer](SocketServer.png)
 
 KafkaServer.startup()初始化各个组件, 包括kafkaController，groupCoordinator等,初始化和请求处理模块使用SocketServer.startup
 
@@ -464,7 +464,7 @@ configureNewConnections
 
 以上流程可以总结为：
 
-![server_acceptor.png](../images/server_acceptor.png)
+![server_acceptor](../images/server_acceptor.png)
 
 processCompletedReceives处理接收到的读写消息，正常情况下将会把receive转换成req对象，然后requestChannel将Request添加到Request队列requestQueue
 ```Scala
@@ -595,7 +595,7 @@ processCompletedReceives的selector.mute(connectionId)
 
 mute: 把read的长注册改成读一次之后，就把read事件取消注册
 
-![mute.png](../images/mute.png)
+![mute](../images/mute.png)
 
 producer通过协商，将message发送到server侧的socket queue, 如果没有mute的情况，会将消息全部接受，不能保证有序性
 
@@ -713,7 +713,7 @@ numChildren = 0
 
 一旦Broker与ZooKeeper的会话终止，该节点就会消失，产生**event事件**
 
-![zk监听.png](../images/zk监听.png)
+![zk监听](../images/zk监听.png)
 
 新的kafka源码把多线程的方案改成了单线程加事件队列的方案
 
@@ -749,7 +749,7 @@ val topicDeletionManager = new TopicDeletionManager(config, controllerContext, r
 def isActive: Boolean = activeControllerId == config.brokerId
 ```
 
-![controller处理event.png](controller处理event.png)
+![controller处理event](controller处理event.png)
 
 以处理controller Startup event为例：
 
@@ -864,41 +864,42 @@ private def elect(): Unit = {
 只有成功注册到的controller节点才会走到这一步
 ```Scala
   private def onControllerFailover(): Unit = {
-    maybeSetupFeatureVersioning()
+  maybeSetupFeatureVersioning()
 
-    info("Registering handlers")
+  info("Registering handlers")
 
-    // 注册the listeners to get broker/topic callbacks
-    val childChangeHandlers = Seq(brokerChangeHandler, topicChangeHandler, topicDeletionHandler, logDirEventNotificationHandler,
-      isrChangeNotificationHandler)
-    childChangeHandlers.foreach(zkClient.registerZNodeChildChangeHandler)
+  // 注册the listeners to get broker/topic callbacks
+  val childChangeHandlers = Seq(brokerChangeHandler, topicChangeHandler, topicDeletionHandler, logDirEventNotificationHandler,
+    isrChangeNotificationHandler)
+  childChangeHandlers.foreach(zkClient.registerZNodeChildChangeHandler)
 
-    val nodeChangeHandlers = Seq(preferredReplicaElectionHandler, partitionReassignmentHandler)
-    nodeChangeHandlers.foreach(zkClient.registerZNodeChangeHandlerAndCheckExistence)
-   
-   // 重要
-    initializeControllerContext()
-  
-    topicDeletionManager.init(topicsToBeDeleted, topicsIneligibleForDeletion)
+  val nodeChangeHandlers = Seq(preferredReplicaElectionHandler, partitionReassignmentHandler)
+  nodeChangeHandlers.foreach(zkClient.registerZNodeChangeHandlerAndCheckExistence)
 
-    // We need to send UpdateMetadataRequest after the controller context is initialized and before the state machines
-    // are started. The is because brokers need to receive the list of live brokers from UpdateMetadataRequest before
-    // they can process the LeaderAndIsrRequests that are generated by replicaStateMachine.startup() and
-    // partitionStateMachine.startup().
-    info("Sending update metadata request")
-    sendUpdateMetadataRequest(controllerContext.liveOrShuttingDownBrokerIds.toSeq, Set.empty)
+  // 重要
+  initializeControllerContext()
 
-    replicaStateMachine.startup()
-    partitionStateMachine.startup()
+  topicDeletionManager.init(topicsToBeDeleted, topicsIneligibleForDeletion)
 
-    info(s"Ready to serve as the new controller with epoch $epoch")
+  // We need to send UpdateMetadataRequest after the controller context is initialized and before the state machines
+  // are started. The is because brokers need to receive the list of live brokers from UpdateMetadataRequest before
+  // they can process the LeaderAndIsrRequests that are generated by replicaStateMachine.startup() and
+  // partitionStateMachine.startup().
+  info("Sending update metadata request")
+  sendUpdateMetadataRequest(controllerContext.liveOrShuttingDownBrokerIds.toSeq, Set.empty)
 
-    initializePartitionReassignments()
-    topicDeletionManager.tryTopicDeletion()
-    val pendingPreferredReplicaElections = fetchPendingPreferredReplicaElections()
-    onReplicaElection(pendingPreferredReplicaElections, ElectionType.PREFERRED, ZkTriggered)
-    info("Starting the controller scheduler")
-    kafkaScheduler.startup()
+  replicaStateMachine.startup()
+  partitionStateMachine.startup()
+
+  info(s"Ready to serve as the new controller with epoch $epoch")
+
+  initializePartitionReassignments()
+  topicDeletionManager.tryTopicDeletion()
+  val pendingPreferredReplicaElections = fetchPendingPreferredReplicaElections()
+  onReplicaElection(pendingPreferredReplicaElections, ElectionType.PREFERRED, ZkTriggered)
+  info("Starting the controller scheduler")
+  kafkaScheduler.startup()
+}
 ```
 
 ### 3.4 副本管理模块
@@ -1050,9 +1051,11 @@ broker咋确定自己是不是Controller，成为Controller的成本
   }
 ```
 
-```Scala
-  case Startup => processStartup()
+```Text
+ case Startup => processStartup()
+```
 
+```Scala
   private def processStartup(): Unit = {
     zkClient.registerZNodeChangeHandlerAndCheckExistence(controllerChangeHandler)
     elect()
@@ -1072,7 +1075,7 @@ broker咋确定自己是不是Controller，成为Controller的成本
     }
 
     try {
-    // 这边抛异常
+      // 这边抛异常
       val (epoch, epochZkVersion) = zkClient.registerControllerAndIncrementControllerEpoch(config.brokerId)
       
       // 只有controller才会走下面的逻辑
