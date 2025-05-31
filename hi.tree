@@ -6,6 +6,7 @@
                   name="JavaDocForXue"
                   start-page="Introduction.md">
 
+    <toc-element topic="Flink.md"/>
     <toc-element topic="DDIA.md"/>
     <toc-element topic="GraphRAG.md"/>
     <toc-element topic="Introduction.md"/>

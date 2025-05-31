@@ -588,7 +588,6 @@ IUserController userController = new UserControllerProxy(new UserController());
    - RPC: 代理实现了协议处理，异常处理等一系列
    - Mybatis Mapper映射：
 
-
 动态代理是为了解决如下的问题：
 1. 需要在代理类中，将原始类中的所有的方法，都重新实现一遍，并且为每个方法都附加相似的代码逻辑
 2. 如果要添加的附加功能的类有不止一个，需要针对每个类都创建一个代理类
@@ -1261,85 +1260,216 @@ private static void alloc() {
 
 ### 3.4 垃圾回收
 
-### 双亲委派
+### 3.5 类加载
 
-1. 什么是双亲委派？
+![类加载](../images/类加载.png)
 
+- 类加载的条件
+- 初始化
+- ClassLoader
 
-2. 为什么需要双亲委派，不委派有什么问题？
+1. 类加载的条件
+
+    Class文件只有在使用的时候才会被装载，Java虚拟机不会无条件地装载Class类型。一个类或接口在初次使用前，必须进行初始化。“使用”是指主动使用，只有下列几种情况：
+    - 当创建一个类的实例时，比如使用new关键字或者反射、克隆、反序列化。
+      - 当调用类的静态方法时，即使用了字节码invokestatic指令。
+      - 当使用类或接口的静态字段时（final常量除外），比如使用getstatic或者putstatic指令。
+      - 当使用java.lang.reflect包中的方法反射类的方法时。
+      - 当初始化子类时，要求先初始化父类。
+      - 作为启动虚拟机，含有main方法的类
+
+    例子：
+    ```Java
+    public class UserParent {
+        public static void main(String[] args) {
+            new Child(); // 主动使用
+            System.out.println(Parent.counter); // 主动使用
+            System.out.println(Parent.counter2); // 被动使用，不初始化类
+        }
+    
+        static class Parent {
+            static {
+                System.out.println("Parent initialization");
+            }
+            private static int counter = 0;
+            private static final int counter2 = 0;
+        }
+    
+        static class Child extends Parent {
+            static {
+                System.out.println("Child initialization");
+            }
+        }
+    }
+    ```
+
+2. 类加载
+
+    启动类加载器负责加载系统的核心类，比如rt.jar中的Java类；扩展类加载器用于加载`JAVA_HOME%/lib/ext/*.jar`中的Java类；应用类加载器用于加载用户类，也就是用户程序的类；自定义类加载器用于加载用户程序的类
+    
+    ![类加载器模型](../images/类加载器模型.png)
+    
+    在类加载的时候，系统会判断当前类是否已经被加载，如果已经被加载，就会直接返回可用的类，否则就会尝试加载。在尝试加载时，会先请求双亲处理，如果请求失败，则会自己加载
+    ```Java
+       // ClassLoader.java
+        protected Class<?> loadClass(String name, boolean resolve)
+            throws ClassNotFoundException
+        {
+            synchronized (getClassLoadingLock(name)) {
+                // First, check if the class has already been loaded-- 先检查类是否已经被加载过
+                Class<?> c = findLoadedClass(name); 
+                if (c == null) {
+                    long t0 = System.nanoTime();
+                    try {
+                        if (parent != null) {
+                            c = parent.loadClass(name, false); // 若没有加载则调用父加载器的loadClass()方法进行加载 
+                        } else {
+                            c = findBootstrapClassOrNull(name); // 若父加载器为空则默认使用启动类加载器作为父加载器
+                        }
+                    } catch (ClassNotFoundException e) {
+                        // ClassNotFoundException thrown if class not found
+                        // from the non-null parent class loader
+                    }
+    
+                    if (c == null) {
+                        // If still not found, then invoke findClass in order
+                        // to find the class.
+                        long t1 = System.nanoTime();
+                        c = findClass(name); // 如果父类加载失败，再调用自己的findClass()方法进行加载
+    
+                        // this is the defining class loader; record the stats
+                        PerfCounter.getParentDelegationTime().addTime(t1 - t0);
+                        PerfCounter.getFindClassTime().addElapsedTimeFrom(t1);
+                        PerfCounter.getFindClasses().increment();
+                    }
+                }
+                if (resolve) {
+                    resolveClass(c);
+                }
+                return c;
+            }
+        }
+    ```
+
+**破坏双亲委派模型**
+
+主要有两类：
+- JNDI服务
+
+    JNDI现在已经是Java的标准服务，它的代码由启动类加载器来完成加载。但JNDI存在的目的就是对资源进行查找和集中管理，
+    它需要调用由其他厂商实现并部署在应用程序的ClassPath下的JNDI服务提供者接口SPI的代码，启动类加载器是绝不可能认识、加载这些代码的，那该怎么办？
+    
+    即上层的ClassLoader无法访问下层的ClassLoader所加载的类，比如比如JDBC、Xml Parser等
+    
+    ![上下文类加载器](../images/上下文类加载器.png)
+    
+    线程上下文类加载器(Thread Context ClassLoader)。这个类加载器可以通过java.lang.Thread类的setContext-ClassLoader()方法进行设置，如果创建线程时还未设置，它将会从父线程中继承一个，如果在应用程序的全局范围内都没有设置过的话，那这个类加载器默认就是应用程序类加载器
+    
+    以javax.xml.parsers中实现XML文件解析功能模块为例，说明如何在启动类加载器中访问由应用类加载器实现的SPI接口实例
+    ```Java
+    Class<?> providerClass = getProviderClass(className, cl, doFallback, useBSClsLoader);
+    
+    static private Class<?> getProviderClass(String className, ClassLoader cl,
+                                             boolean doFallback, boolean useBSClsLoader) throws ClassNotFoundException {
+        try {
+            if (cl == null) {
+                if (useBSClsLoader) {
+                    return Class.forName(className, false, FactoryFinder.class.getClassLoader());
+                } else {
+                    cl = SecuritySupport.getContextClassLoader();
+                    if (cl == null) {
+                        throw new ClassNotFoundException();
+                    } else {
+                        return Class.forName(className, false, cl);
+                    }
+                }
+            } else {
+                return Class.forName(className, false, cl);
+            }
+        }
+    }
+    ```
+
+- 热替换(Hot Swap)
+
+    由不同ClassLoader加载的同名类属于不同的类型，不能相互转化和兼容。
+    
+    ![热替换](../images/热替换.png)
+    
+    自己实现的热替换其实很简单。
+    
+    DoopRun的不停循环，每次用一个新的MyClassLoader去加载目录下的DemoA类的class文件
+    ```Java
+    public class DoopRun {
+        public static void main(String args[]) {
+            System.out.println(new DemoA());
+    
+            while(true){
+                try{
+                    MyClassLoader loader = new MyClassLoader("D:/tmp/clz");
+                    Class cls = loader.loadClass("geym.zbase.ch10.clshot.DemoA");
+                    Object demo = cls.newInstance();
+    
+                    Method m = demo.getClass().getMethod("hot", new Class[] {});
+                    m.invoke(demo, new Object[] {});
+                    Thread.sleep(10000);
+                }catch(Exception e){
+                    System.out.println("not find");
+                    try {
+                        Thread.sleep(10000);
+                    } catch (InterruptedException e1) {
+                    }
+                }
+            }
+        }
+    }
+    
+    ```
+
+**为什么需要双亲委派，不委派有什么问题？**
    - 避免类的重复加载,当父加载器已经加载过某一个类时，子加载器就不会再重新加载这个类
    - 沙箱安全机制:
      自定义String类，但是在加载自定义String类的时候会率先使用引导类加载器加载，而引导类加载器在加载的过程中会先加载jdk自带的文件（rt.jar包中java\lang\String.class），报错信息说没有main方法，就是因为加载的是rt.jar包中的string类。这样可以保证对java核心源代码的保护，这就是沙箱安全机制
 
 
-3. "父加载器"和"子加载器"之间的关系是继承的吗？
+**"父加载器"和"子加载器"之间的关系是继承的吗？**
 
-   使用组合（Composition）关系来复用父加载器的代码的
-   ```Java
-   public abstract class ClassLoader {
-       // The parent class loader for delegation
-       private final ClassLoader parent;
-   }
-   ```
+使用组合（Composition）关系来复用父加载器的代码
+```Java
+public abstract class ClassLoader {
+   // The parent class loader for delegation
+   private final ClassLoader parent;
+}
+```
 
+不需要破坏双亲委派的话，只需要实现findClass(), 破坏双亲委派的话，只需要实现loadClass(),然后通过
+```Java
+MyClassLoader mcl = new MyClassLoader();        
+Class<?> c1 = Class.forName("com.xrq.classloader.Person", true, mcl); 
+Object obj = c1.newInstance();
+```
 
-4. 双亲委派是怎么实现的？
+**为什么tomcat要破坏双亲委派？**
 
-   java.lang.ClassLoader的loadClass()
+这个是由tomcat的业务决定的。不同的WebApp有共同的类需要依赖，也有业务相同的类需要区分
 
-   ```Java
-    protected Class<?> loadClass(String name, boolean resolve)
-        throws ClassNotFoundException
-    {
-        synchronized (getClassLoadingLock(name)) {
-            // First, check if the class has already been loaded-- 先检查类是否已经被加载过
-            Class<?> c = findLoadedClass(name); 
-            if (c == null) {
-                long t0 = System.nanoTime();
-                try {
-                    if (parent != null) {
-                        c = parent.loadClass(name, false); // 若没有加载则调用父加载器的loadClass()方法进行加载 
-                    } else {
-                        c = findBootstrapClassOrNull(name); // 若父加载器为空则默认使用启动类加载器作为父加载器
-                    }
-                } catch (ClassNotFoundException e) {
-                    // ClassNotFoundException thrown if class not found
-                    // from the non-null parent class loader
-                }
+![tomcat双亲委派](../images/tomcat双亲委派.png)
 
-                if (c == null) {
-                    // If still not found, then invoke findClass in order
-                    // to find the class.
-                    long t1 = System.nanoTime();
-                    c = findClass(name); // 如果父类加载失败，再调用自己的findClass()方法进行加载
+**谈谈模块化技术的理解**
 
-                    // this is the defining class loader; record the stats
-                    PerfCounter.getParentDelegationTime().addTime(t1 - t0);
-                    PerfCounter.getFindClassTime().addElapsedTimeFrom(t1);
-                    PerfCounter.getFindClasses().increment();
-                }
-            }
-            if (resolve) {
-                resolveClass(c);
-            }
-            return c;
-        }
-    }
-    ```
-   不需要破坏双亲委派的话，只需要实现findClass(), 破坏双亲委派的话，只需要实现loadClass(),然后通过
-   ```Java
-   MyClassLoader mcl = new MyClassLoader();        
-   Class<?> c1 = Class.forName("com.xrq.classloader.Person", true, mcl); 
-   Object obj = c1.newInstance();
-   ```
+Extension Class Loader被Platform ClassLoader取代。整个JDK都基于模块化进行构建（原来的rt.jar和tools.jar被拆分成数十个JMOD文件），
+其中的Java类库就已天然地满足了可扩展的需求，无须再保留lib\ext目录。新JDK中也取消了jre目录，因为随时可以组合构建出所需JRE。
+
+譬如假设我们只使用java.base模块中的类型，那么随时可以通过以下命令打包出一个“JRE”：
+```
+jlink -p $JAVA_HOME/jmods --add-modules java.base --output jre
+```
+
+在委派给父加载器加载前，先判断该类是否能够归属到某一个系统模块中，如果可以找到这样的归属关系，就要优先委派给负责那个模块的加载器完成加载
+
+![9之后的类加载器](../images/9之后的类加载器.png)
 
 
-5. 我能不能主动破坏这种双亲委派机制？怎么破坏？
-6. 为什么重写loadClass方法可以破坏双亲委派，这个方法和findClass（）、defineClass（）区别是什么？
-7. 说一说你知道的双亲委派被破坏的例子吧
-8. 为什么JNDI、JDBC等需要破坏双亲委派？
-9. 为什么TOMCAT要破坏双亲委派？ 1
-10. 谈谈你对模块化技术的理解吧
 
 ## 字节码
 
