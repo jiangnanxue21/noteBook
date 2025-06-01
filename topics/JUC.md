@@ -1072,7 +1072,31 @@ completableFuture.thenRun(() -> System.out.println(1));
 
 ## 并发容器
 
+### BlockingQueue
+
 ![](../images/blockingQueue.png)
+
+BlockingQueue继承Queue，Queue继承自Collection。所以Collection最基础的增删改查操作是有的，在这个基础上，多了Queue的特点，在这个基础上又多了阻塞的特点
+
+阻塞方法
+- put(E e)：将元素插入队列，如果队列已满，则会阻塞，直到队列有空间为止。
+- take()：从队列中取出元素，如果队列为空，则会阻塞，直到队列有元素为止。
+- offer(E e, long timeout, TimeUnit unit)：尝试在指定的等待时间内将元素插入队列，如果在指定时间内队列满了，则返回 false，否则插入成功返回 true。
+- poll(long timeout, TimeUnit unit)：尝试在指定的等待时间内从队列中取出元素，如果在指定时间内队列为空，则返回 null，否则取出成功返回元素。
+
+非阻塞方法
+- add(E e)：将元素插入队列，如果队列已满，则抛出 IllegalStateException 异常。
+- remove()：从队列中取出元素，如果队列为空，则抛出 NoSuchElementException 异常。
+- element()：获取队列头部的元素，但不移除它，如果队列为空，则抛出 NoSuchElementException 异常。
+- peek()：获取队列头部的元素，但不移除它，如果队列为空，则返回 null。
+
+
+#### ArrayBlockingQueue
+
+A bounded blocking queue backed by an array
+
+
+
 
 ### HashMap
 
