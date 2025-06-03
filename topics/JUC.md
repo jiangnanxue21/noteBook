@@ -7,12 +7,104 @@
 
 ![](../images/blockingQueue.png)
 
+BlockingQueue继承Queue，Queue继承自Collection。所以Collection最基础的增删改查操作是有的，在这个基础上，多了Queue的特点，在这个基础上又多了阻塞的特点
+
+阻塞方法
+- put(E e)：将元素插入队列，如果队列已满，则会阻塞，直到队列有空间为止。
+- take()：从队列中取出元素，如果队列为空，则会阻塞，直到队列有元素为止。
+- offer(E e, long timeout, TimeUnit unit)：尝试在指定的等待时间内将元素插入队列，如果在指定时间内队列满了，则返回 false，否则插入成功返回 true。
+- poll(long timeout, TimeUnit unit)：尝试在指定的等待时间内从队列中取出元素，如果在指定时间内队列为空，则返回 null，否则取出成功返回元素。
+
+非阻塞方法
+- add(E e)：将元素插入队列，如果队列已满，则抛出 IllegalStateException 异常。
+- remove()：从队列中取出元素，如果队列为空，则抛出 NoSuchElementException 异常。
+- element()：获取队列头部的元素，但不移除它，如果队列为空，则抛出 NoSuchElementException 异常。
+- peek()：获取队列头部的元素，但不移除它，如果队列为空，则返回 null。
+
+
+#### ArrayBlockingQueue
+
+A bounded blocking queue backed by an array
 
 ## 5. 线程池
 ## 6. 并发集合
 
 ### HashMap
 
+```Java
+    final V putVal(int hash, K key, V value, boolean onlyIfAbsent,
+                   boolean evict) {
+        Node<K,V>[] tab; Node<K,V> p; int n, i;
+        if ((tab = table) == null || (n = tab.length) == 0)
+            n = (tab = resize()).length;
+        if ((p = tab[i = (n - 1) & hash]) == null)
+            tab[i] = newNode(hash, key, value, null);
+        else {
+            Node<K,V> e; K k;
+            if (p.hash == hash &&
+                ((k = p.key) == key || (key != null && key.equals(k))))
+                e = p;
+            else if (p instanceof TreeNode)
+                e = ((TreeNode<K,V>)p).putTreeVal(this, tab, hash, key, value);
+            else {
+                for (int binCount = 0; ; ++binCount) {
+                    if ((e = p.next) == null) {
+                        p.next = newNode(hash, key, value, null);
+                        if (binCount >= TREEIFY_THRESHOLD - 1) // -1 for 1st
+                            treeifyBin(tab, hash);
+                        break;
+                    }
+                    if (e.hash == hash &&
+                        ((k = e.key) == key || (key != null && key.equals(k))))
+                        break;
+                    p = e;
+                }
+            }
+            if (e != null) { // existing mapping for key
+                V oldValue = e.value;
+                if (!onlyIfAbsent || oldValue == null)
+                    e.value = value;
+                afterNodeAccess(e);
+                return oldValue;
+            }
+        }
+        ++modCount;
+        if (++size > threshold)
+            resize();
+        afterNodeInsertion(evict);
+        return null;
+    }
+```
+
+从问题看源码：
+1. 什么条件会树化？
+
+   结论：因此如果某个桶中的链表长度大于等于8了，则会判断当前的hashmap的容量是否大于64，如果小于64，则会进行扩容；如果大于64，则将链表转为红黑树
+
+   桶的个数要大于等于8
+   ```
+   // TREEIFY_THRESHOLD = 8
+   if (binCount >= TREEIFY_THRESHOLD - 1) // -1 for 1st
+       treeifyBin(tab, hash);
+   ```
+
+   还有个条件，tab的长度要小于MIN_TREEIFY_CAPACITY=64
+   ```
+    final void treeifyBin(Node<K,V>[] tab, int hash) {
+        int n, index; Node<K,V> e;
+        if (tab == null || (n = tab.length) < MIN_TREEIFY_CAPACITY)
+            resize();
+   ```
+
+2. 装填因子为什么是0.75? 很简单，高了xx，低了xx
+3. 主数组长度为什么是2^n？
+4. 扩容机制？
+
+   当HashMap 的负载因子达到阈值（默认是0.75）时，会触发扩容操作。扩容时，HashMap 的容量会增加一倍,从原来的容量$2^n$扩容到$2^{n+1}$。此时，桶数组的长度从原来的$2^n$变为$2^{n+1}$。
+
+   由于哈希值是通过hash方法计算的，而这个方法的输出是一个32位的整数。在扩容时，桶数组的长度从$2^n$为$2^{n+1}$，这意味着桶数组的索引计算方式从原来的hash%$2^{n}$变为hash%$2^{n+1}$。因此索引计算可以简化为位运算。
+
+5. 初始化容量？默认初始化容量是16，指定的话需要满足$2^n$
 
 ### ConcurrentHashMap
 
