@@ -42,7 +42,7 @@
 
 Lambda架构的基本思想
 
-![lambda架构.png](../images/lambda架构.png)
+![lambda架构](../images/lambda架构.png)
 
 整个数据处理流程抽象成$View = Query(Data)$这样一个函数。我们所有的报表、看板、数据分析结果，都是来自对于原始日志的分析
 
