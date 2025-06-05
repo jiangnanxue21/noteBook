@@ -1,7 +1,164 @@
 # JUC 
 
 ## 1. 基础概念的问题
+
+#### 线程的创建
+
+- 继承Thread类 重写run方法
+
+  为什么创建线程不要直接用thread
+
+- 实现Runnable接口 重写run方法
+- 配合FutureTask。实现Callable 重写call方法
+
+##### interrupt方式
+
+共享变量方式
+
+isInterrupted会返回当前状态并且归为为false
+```java
+public static void main(String[] args) throws InterruptedException {
+    // 线程默认情况下，    interrupt标记位：false
+    System.out.println(Thread.currentThread().isInterrupted());
+    // 执行interrupt之后，再次查看打断信息
+    Thread.currentThread().interrupt();
+    // interrupt标记位：ture
+    System.out.println(Thread.currentThread().isInterrupted());
+    // 返回当前线程，并归位为false interrupt标记位：ture
+    System.out.println(Thread.interrupted());
+    // 已经归位了
+    System.out.println(Thread.interrupted());
+
+    // =====================================================
+    Thread t1 = new Thread(() -> {
+        while(!Thread.currentThread().isInterrupted()){
+            // 处理业务
+        }
+        System.out.println("t1结束");
+    });
+    t1.start();
+    Thread.sleep(500);
+    t1.interrupt();
+}
+```
+
+通过打断WAITING或者TIMED_WAITING状态的线程，从而抛出异常自行处理
+
+下面这种停止线程方式是最常用的一种，在框架和JUC中也是最常见的
+```java
+public static void main(String[] args) throws InterruptedException {
+    Thread t1 = new Thread(() -> {
+        while(true){
+            // 获取任务
+            // 拿到任务，执行任务
+            // 没有任务了，让线程休眠
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+                System.out.println("基于打断形式结束当前线程");
+                return;
+            }
+        }
+    });
+    t1.start();
+    Thread.sleep(500);
+    t1.interrupt(); // 打断上面的sleep
+}
+```
+
+wait和sleep的区别？
+* sleep属于Thread类中的static方法、wait属于Object类的方法
+* sleep属于TIMED_WAITING，自动被唤醒、wait属于WAITING，需要手动唤醒。
+* sleep方法在持有锁时，执行，不会释放锁资源、wait在执行后，会释放锁资源。
+* sleep可以在持有锁或者不持有锁时，执行。 wait方法必须在只有锁时才可以执行。
+
+wait方法会将持有锁的线程从owner扔到WaitSet集合中，这个操作是在修改ObjectMonitor对象，如果没有持有synchronized锁的话，是无法操作ObjectMonitor对象的。
+
 ## 2. 三大特性
+
+### 2.1 原子性
+
+JMM（Java Memory Model）。不同的硬件和不同的操作系统在内存上的操作有一定差异的。Java为了解决相同代码在不同操作系统上出现的各种问题，用JMM屏蔽掉各种硬件和操作系统带来的差异。
+
+让Java的并发编程可以做到跨平台。
+
+JMM规定所有变量都会存储在主内存中，在操作的时候，需要从主内存中复制一份到线程内存（CPU内存），在线程内部做计算。**然后再写回主内存中（不一定！）。**
+
+#### 保证并发编程的原子性
+
+- synchronized
+
+因为++操作可以从指令中查看到
+
+![++指令](../images/加加指令.png)
+
+可以在方法上追加synchronized关键字或者采用同步代码块的形式来保证原子性
+
+synchronized可以让避免多线程同时操作临街资源，同一时间点，只会有一个线程正在操作临界资源
+
+![synchronized指令](../images/synchronized指令.png)
+
+- CAS
+
+到底什么是CAS
+
+compare and swap也就是比较和交换，他是一条CPU的并发原语。
+
+他在替换内存的某个位置的值时，首先查看内存中的值与预期值是否一致，如果一致，执行替换操作。这个操作是一个原子性操作。
+
+Java中基于Unsafe的类提供了对CAS的操作的方法，JVM会帮助我们将方法实现CAS汇编指令。
+
+但是要清楚CAS只是比较和交换，在获取原值的这个操作上，需要你自己实现。
+
+```java
+private static AtomicInteger count = new AtomicInteger(0);
+
+public static void main(String[] args) throws InterruptedException {
+    Thread t1 = new Thread(() -> {
+        for (int i = 0; i < 100; i++) {
+            count.incrementAndGet();
+        }
+    });
+    Thread t2 = new Thread(() -> {
+        for (int i = 0; i < 100; i++) {
+            count.incrementAndGet();
+        }
+    });
+    t1.start();
+    t2.start();
+    t1.join();
+    t2.join();
+    System.out.println(count);
+}
+```
+
+Doug Lea在CAS的基础上帮助我们实现了一些原子类，其中就包括现在看到的AtomicInteger，还有其他很多原子类……
+
+**CAS的缺点**：CAS只能保证对一个变量的操作是原子性的，无法实现对多行代码实现原子性。
+
+**CAS的问题**：
+
+* **ABA问题**：问题如下，可以引入版本号的方式，来解决ABA的问题。Java中提供了一个类在CAS时，针对各个版本追加版本号的操作。 AtomicStampeReference![image.png](https://fynotefile.oss-cn-zhangjiakou.aliyuncs.com/fynote/fyfile/2746/1654095150060/1a90706738b3476d81d038d2648d3c7c.png)
+* AtomicStampedReference在CAS时，不但会判断原值，还会比较版本信息。
+* ```java
+  public static void main(String[] args) {
+      AtomicStampedReference<String> reference = new AtomicStampedReference<>("AAA",1);
+
+      String oldValue = reference.getReference();
+      int oldVersion = reference.getStamp();
+
+      boolean b = reference.compareAndSet(oldValue, "B", oldVersion, oldVersion + 1);
+      System.out.println("修改1版本的：" + b);
+
+      boolean c = reference.compareAndSet("B", "C", 1, 1 + 1);
+      System.out.println("修改2版本的：" + c);
+  }
+  ```
+* **自旋时间过长问题**：
+   * 可以指定CAS一共循环多少次，如果超过这个次数，直接失败/或者挂起线程。（自旋锁、自适应自旋锁）
+   * 可以在CAS一次失败后，将这个操作暂存起来，后面需要获取结果时，将暂存的操作全部执行，再返回最后的结果。
+
 ## 3. 锁
 ## 4. 阻塞队列
 
@@ -16,15 +173,63 @@ BlockingQueue继承Queue，Queue继承自Collection。所以Collection最基础�
 - poll(long timeout, TimeUnit unit)：尝试在指定的等待时间内从队列中取出元素，如果在指定时间内队列为空，则返回 null，否则取出成功返回元素。
 
 非阻塞方法
-- add(E e)：将元素插入队列，如果队列已满，则抛出 IllegalStateException 异常。
-- remove()：从队列中取出元素，如果队列为空，则抛出 NoSuchElementException 异常。
-- element()：获取队列头部的元素，但不移除它，如果队列为空，则抛出 NoSuchElementException 异常。
-- peek()：获取队列头部的元素，但不移除它，如果队列为空，则返回 null。
-
+- add(E e)：将元素插入队列，如果队列已满，则抛出IllegalStateException异常
+- remove()：从队列中取出元素，如果队列为空，则抛出NoSuchElementException异常
+- element()：获取队列头部的元素，但不移除它，如果队列为空，则抛出NoSuchElementException异常
+- peek()：获取队列头部的元素，但不移除它，如果队列为空，则返回null。
 
 #### ArrayBlockingQueue
 
 A bounded blocking queue backed by an array
+
+#### SynchronousQueue
+SynchronousQueue队列实现*线程之间的直接交换hand-off*，不存储数据，存储生产者或者是消费者
+
+当存储一个生产者到SynchronousQueue队列中之后，生产者会阻塞（看调用的方法）
+
+进到SynchronousQueue类的内部后，有一个内部类Transferer，提供了一个transfer的方法
+
+```java
+abstract static class Transferer<E> {
+    abstract E transfer(E e, boolean timed, long nanos);
+}
+```
+
+当前这个类中提供的transfer方法，就是生产者和消费者在调用读写数据时要用到的核心方法。
+
+生产者在调用上述的transfer方法时，第一个参数e会正常传递数据
+
+消费者在调用上述的transfer方法时，第一个参数e会传递null
+
+SynchronousQueue针对抽象类Transferer做了几种实现。
+
+一共看到了两种实现方式：
+
+- TransferStack
+- TransferQueue
+
+这两种类继承了Transferer抽象类，在构建SynchronousQueue时，会指定使用哪种子类
+
+```java
+// 到底采用哪种实现，需要把对应的对象存放到这个属性中
+private transient volatile Transferer<E> transferer;
+// 采用无参时，会调用下述方法，再次调用有参构造传入false
+public SynchronousQueue() {
+    this(false);
+}
+// 调用的是当前的有参构造，fair代表公平还是不公平
+public SynchronousQueue(boolean fair) {
+    // 如果是公平，采用Queue，如果是不公平，采用Stack
+    transferer = fair ? new TransferQueue<E>() : new TransferStack<E>();
+}
+```
+当TransferQueue，且先生产数据的情况
+
+![先生产数据的Queue情况](../images/TransferQueue.png)
+
+当fair是false的时候，是非公平的情况
+
+![TransferStack.png](../images/TransferStack.png)
 
 ## 5. 线程池
 ## 6. 并发集合

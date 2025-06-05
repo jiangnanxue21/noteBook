@@ -220,10 +220,15 @@ SQL标准的事务隔离级别包括：
 
 **Example:**
 
-![事务example](../images/事务example.png)
+<p>
+<img src="../images/事务example.png" alt="事务example" width="300"/>
+</p>
 
 不同事务隔离级别的值也是不同的：
-- read uncommitted：
+- read uncommitted：v1 = 2, v2 = 2, v3 = 2
+- read committed：v1 = 2, v2 = 2, v3 = 2
+- repeatable read：v1 = 2, v2 = 2, v3 = 2
+- serializable：v1 = 2, v2 = 2, v3 = 2
 
 ### 锁
 - 全局锁
