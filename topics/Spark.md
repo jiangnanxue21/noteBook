@@ -669,19 +669,17 @@ ApplicationMaster：归属于yarn，等于说是yarn暴露出来的一个接口�
 
 ## 4. 源码部分
 
-主要是看资源层和计算层
+看资源层和计算层，计算是重点
 
 ![spark源码分析.png](../images/spark源码分析.png)
 
 ![rpcEnv.png](../images/rpcEnv.png)
 
-### 4.1 RpcEnv
+### 资源层
 
-启动spark,调用的是start-all.sh
+#### 4.1 RpcEnv
 
-```Shell
-sbin/start-all.sh
-```
+启动spark,调用的是bin/start-all.sh
 
 下面先分析Master的启动，再分析Workers的启动
 
@@ -693,8 +691,15 @@ sbin/start-all.sh
 "${SPARK_HOME}/sbin"/start-slaves.sh
 ```
 
-#### Start Master
+**Master启动**
 
+start-all.sh
+```Shell
+# Start Master
+"${SPARK_HOME}/sbin"/start-master.sh
+```
+
+start-master.sh
 ```Shell
 CLASS="org.apache.spark.deploy.master.Master"
 ....
@@ -703,14 +708,19 @@ CLASS="org.apache.spark.deploy.master.Master"
   $ORIGINAL_ARGS
 ```
 
+org.apache.spark.deploy.master.Master
+
 ```Scala
 def main(argStrings: Array[String]) {
   // 启动rpc，等待连接
   val (rpcEnv, _, _) = startRpcEnvAndEndpoint(args.host, args.port, args.webUiPort, conf)
+  
+  // 等待不退出
   rpcEnv.awaitTermination()
 }
 ```
 
+主要啊startRpcEnvAndEndpoint方法
 ```Scala
 def startRpcEnvAndEndpoint(
     host: String,
@@ -729,3 +739,63 @@ def startRpcEnvAndEndpoint(
 ```
 
 RpcEnv.create中，调用了netty
+```Scala
+  def create(config: RpcEnvConfig): RpcEnv = {
+    val sparkConf = config.conf
+    val javaSerializerInstance =
+      new JavaSerializer(sparkConf).newInstance().asInstanceOf[JavaSerializerInstance]
+    val nettyEnv =
+      new NettyRpcEnv(sparkConf, javaSerializerInstance, config.advertiseAddress,
+        config.securityManager, config.numUsableCores)
+    if (!config.clientMode) {
+      // start netty的函数
+      val startNettyRpcEnv: Int => (NettyRpcEnv, Int) = { actualPort =>
+        nettyEnv.startServer(config.bindAddress, actualPort)
+        (nettyEnv, nettyEnv.address.port)
+      }
+      try {
+        Utils.startServiceOnPort(config.port, startNettyRpcEnv, sparkConf, config.name)._1
+      } catch {
+        case NonFatal(e) =>
+          nettyEnv.shutdown()
+          throw e
+      }
+    }
+    nettyEnv
+  }
+```
+
+和上面的图所示，NettyRpcEnv包含了dispatcher和传输层transportContext
+
+<code-block lang="plantuml">
+<![CDATA[
+@startuml
+component NettyRpcEnv {
+  component [Dispatcher] as Dispatcher
+  component [传输服务TransportServer] as TransportServer
+}
+
+component [postMessage] as postMessage
+
+Dispatcher --> postMessage : 调用
+TransportServer --> postMessage : 调用
+@enduml
+]]>
+</code-block>
+
+```Scala
+private[netty] class NettyRpcEnv(
+    val conf: SparkConf,
+    javaSerializerInstance: JavaSerializerInstance,
+    host: String,
+    securityManager: SecurityManager,
+    numUsableCores: Int) extends RpcEnv(conf) with Logging {
+
+  private val dispatcher: Dispatcher = new Dispatcher(this, numUsableCores)
+
+  private val streamManager = new NettyStreamManager(this)
+
+  private val transportContext = new TransportContext(transportConf,
+    new NettyRpcHandler(dispatcher, this, streamManager))
+}
+```
