@@ -79,7 +79,9 @@ Kafka还没有成熟的时候，把数据分成批处理层和实时处理层是
 
 生产者客户端的整体架构，如下所示：
 
-![procuder](../images/producer.png)
+<p>
+<img src="../images/producer.png" alt="producer" width="800"/>
+</p>
 
 从以下几个方面来看它的实现： 
 - 数据分区分配策略 
@@ -89,92 +91,107 @@ Kafka还没有成熟的时候，把数据分成批处理层和实时处理层是
 
 **数据分区分配策略**
 
-有两种分配策略：RoundRobinPartitioner和UniformStickyPartitioner
+有3种分配策略：DefaultPartitioner, RoundRobinPartitioner和UniformStickyPartitioner
 
-RoundRobinPartitioner就是每次均匀分配 
+- RoundRobinPartitioner
 
-UniformStickyPartitioner是默认的Partitioner
+  每次均匀分配,无论是否有key
 
-KIP-480: Sticky Partitioner引入了UniformStickyPartitioner作为默认的分区器。这个是在Round-robin策略上的优化
+- DefaultPartitioner
 
-会从本地缓存中拿对应topic的分区，所以具有粘性(Sticky),只有当newBatch或者indexCache为空的情况下才会重新计算分区
-```Java
-public int partition(String topic, Cluster cluster) {
-   Integer part = indexCache.get(topic);
-   if (part == null) {
-   return nextPartition(topic, cluster, -1);
-   }
-   return part;
-}
-```
+  1. 若消息指定了分区，则使用该分区
+  2. 若未指定分区但存在key，则根据key的哈希值对分区数取模选择分区，确保相同key的消息写入同一分区
+  3. 若既未指定分区又无key，则采用UniformStickyPartitioner，随机选择一个分区，并尽可能一直使用该分区，直到该分区的批次已满（batch.size）或linger.ms时间到，再重新选择分区
 
-newBatch指的是该batch已经满或者到达了发送的时间。UniformStickyPartitioner计算分区也很简单，即随机数
+- UniformStickyPartitioner
 
-```Text
-if (availablePartitions.size() == 1) {
-       newPart = availablePartitions.get(0).partition();
-   } else {
-       while (newPart == null || newPart.equals(oldPart)) {
-           int random = Utils.toPositive(ThreadLocalRandom.current().nextInt());
-           newPart = availablePartitions.get(random % availablePartitions.size()).partition();
-       }
-}
-```
-
-但是UniformStickyPartitioner有在某些场景下会有问题，在3.3.0废弃，[KIP-794](https://cwiki.apache.org/confluence/display/KAFKA/KIP-794%3A+Strictly+Uniform+Sticky+Partitioner)做了优化，解决**分配倾斜**
-
-UniformStickyPartitioner会将更多消息分配给速度较慢的broker，并且可能导致“失控”的问题。因为“粘性”时间是由新的批量创建消息驱动的，这与broker的延迟成反比——较慢的broker消耗批量消息的速度较慢，因此它们会比速度更快的分区获得更多的“粘性”时间，从而是消息分配倾斜。
-
-假设一个生产者写入的消息到3个分区（生产者配置为linger.ms=0），并且一个partition由于某种原因（leader broker选举更换或网络抖动问题等情况）导致稍微变慢了一点。生产者必须一直保留发送到这个partition的批次消息，直到partition变得可用。在保留这些批次消息的同时，因为生产者还没有准备好发送到这个分区，其他批次的消息又大批量发送的并开始堆积，从而可能导致每个批次都可能会被填满。
-
-KIP-794对UniformStickyPartitioner做了优化，可以采用自适应分区切换
-
-**切换策略**：分配分区的概率与队列长度成反比
-
-每次partitionReady之后，更新partition的统计信息
-```Text
-topicInfo.builtInPartitioner.updatePartitionLoadStats(queueSizes, partitionIds, queueSizesIndex + 1);
- .....
-partitionLoadStats = new PartitionLoadStats(queueSizes, partitionIds, length);
-```
-
-PartitionLoadStats的构造函数
-```Java
-  private final static class PartitionLoadStats {
-    public final int[] cumulativeFrequencyTable;
-    public final int[] partitionIds;
-    public final int length;
-}
-```
-
-主要的逻辑是cumulativeFrequencyTable的构造，注释中举了个例子
-```Text
-Example: 
-  假设有3个partitions的队列长度分别是:
-  0 3 1
-  最大的queue的长度+1则等于3+1=4，再减去每个queue的长度则是
-  4 1 3
-  再做前缀和，则cumulativeFrequencyTable数组可以赋值为
-  4 5 8
-```
-那构造了CFT数组如何去用呢，取一个随机数[0..8)，然后看它比CFT数组哪个值比较大则去对应下标。如随机到4的话，选择第二个Partition
+    KIP-480: Sticky Partitioner引入了UniformStickyPartitioner。这个是在Round-robin策略上的优化
+    
+    会从本地缓存中拿对应topic的分区，所以具有粘性(Sticky)，只有当newBatch或者indexCache为空的情况下才会重新计算分区
+    
+    newBatch指的是该batch已经满或者到达了发送的时间。UniformStickyPartitioner计算分区也很简单，即随机数
+    
+    ```Text
+    if (availablePartitions.size() == 1) {
+           newPart = availablePartitions.get(0).partition();
+       } else {
+           while (newPart == null || newPart.equals(oldPart)) {
+               int random = Utils.toPositive(ThreadLocalRandom.current().nextInt());
+               newPart = availablePartitions.get(random % availablePartitions.size()).partition();
+           }
+    }
+    ```
+    
+    但是UniformStickyPartitioner有在某些场景下会有问题，在3.3.0废弃，[KIP-794](https://cwiki.apache.org/confluence/display/KAFKA/KIP-794%3A+Strictly+Uniform+Sticky+Partitioner)做了优化，解决**分配倾斜**
+    
+    UniformStickyPartitioner会将更多消息分配给速度较慢的broker，并且可能导致“失控”的问题。因为“粘性”时间是由新的批量创建消息驱动的，这与broker的延迟成反比——较慢的broker消耗批量消息的速度较慢，因此它们会比速度更快的分区获得更多的“粘性”时间，从而是消息分配倾斜。
+    
+    假设一个生产者写入的消息到3个分区（生产者配置为linger.ms=0），并且一个partition由于某种原因（leader broker选举更换或网络抖动问题等情况）导致稍微变慢了一点。生产者必须一直保留发送到这个partition的批次消息，直到partition变得可用。
+    在保留这些批次消息的同时，因为生产者还没有准备好发送到这个分区，其他批次的消息又大批量发送的并开始堆积，从而可能导致每个批次都可能会被填满。
+    
+    KIP-794对UniformStickyPartitioner做了优化，可以采用自适应分区切换
+    
+    **切换策略**：分配分区的概率与队列长度成反比
+    
+    每次partitionReady之后，更新partition的统计信息, PartitionLoadStats的构造函数
+    ```Java
+      private final static class PartitionLoadStats {
+        public final int[] cumulativeFrequencyTable;
+        public final int[] partitionIds;
+        public final int length;
+    }
+    ```
+    
+    主要的逻辑是cumulativeFrequencyTable的构造，注释中举了个例子
+    ```Text
+    Example: 
+      假设有3个partitions的队列长度分别是:
+      0 3 1
+      最大的queue的长度+1则等于3+1=4，再减去每个queue的长度则是
+      4 1 3
+      再做前缀和，则cumulativeFrequencyTable数组可以赋值为
+      4 5 8
+    ```
+    那构造了CFT数组如何去用呢，取一个随机数[0..8)，然后看它比CFT数组哪个值比较大则去对应下标。如随机到4的话，选择第二个Partition
 
 **RecordAccumulator的实现，即内存管理和分配**
 
 RecordAccumulator主要用来缓存消息以便Sender线程可以批量发送，进而减少网络传输的资源消耗以提升性能
 
-![RecodeAccumulator](../images/RecodeAccumulator.png)
+<p>
+<img src="../images/RecodeAccumulator.png" alt="RecodeAccumulator" width="600" height="150"/>
+</p>
 
-什么条件可以发送数据？
+
+另外的sender线程会不断的执行runOnce，从RecodeAccumulator拉取准备好的数据
+```Java
+    void runOnce() {
+        long currentTimeMs = time.milliseconds();
+        // 有元数据的情况下进行
+        // 网络没有建立好，是不会发送消息的
+        long pollTimeout = sendProducerData(currentTimeMs);
+        // 第一次的话去拉取元数据
+        // 真正执行网络操作的都是这个NetworkClient组件，包括发送请求，接受响应
+        client.poll(pollTimeout, currentTimeMs);
+    }
+```
+
+那什么条件可以发送数据？
 
 ```Java
-// Sende.java
+// Sender.java
 private long sendProducerData(long now) {
     // 第二次进来的话已经有元数据
     Cluster cluster = metadata.fetch(); // 获取元数据
     // get the list of partitions with data ready to send
     // 判断哪些partition哪些队列可以发送，获取partition的leader partition对应的broker主机
     RecordAccumulator.ReadyCheckResult result = this.accumulator.ready(cluster, now);
+
+    // create produce requests
+    // 要发送的partition有很多个，很有可能有一些partition的leader partition是在同一台服务器上的
+    // 按照broker的partition进行分组
+    Map<Integer, List<ProducerBatch>> batches = this.accumulator.drain(cluster, result.readyNodes, this.maxRequestSize, now);
+    addToInflightBatches(batches);
 }
 ```
 
@@ -258,36 +275,76 @@ public ReadyCheckResult ready(Cluster cluster, long nowMs) {
 
 **meta更新策略**
 
-当客户端中没有需要使用的元数据信息时，比如没有指定的主题信息，或者超过metadata.max.age.ms时间没有更新元数据都会引起元数据的更新操作
+当客户端中没有需要使用的元数据信息时，比如没有指定的主题信息，或者超过metadata.max.age.ms，即5分钟没有更新元数据都会引起元数据的更新操作
 
-客户端参数metadata.max.age.ms的默认值为300000，即5分钟。元数据的更新操作是在客户端内部进行的，对客户端的外部使用者不可见。当需要更新元数据时，会先挑选出leastLoadedNode，然后向这个Node发送MetadataRequest请求来获取具体的元数据信息
+Kafka的元数据（Metadata）更新过程是一个异步、重试、最终一致的机制，由Producer主线程和Sender子线程协同完成
+
+| 阶段   | 动作                                                           | 关键源码/方法                                           |
+|------|--------------------------------------------------------------|---------------------------------------------------|
+| ① 触发 | 首次发送、Topic 不存在、Leader 切换、收到 `NOT_LEADER_FOR_PARTITION` 等异常   | `waitOnMetadata()` → `requestUpdate()`            |
+| ② 发起 | Sender 线程挑选 **负载最小的节点**（leastLoadedNode）发送 `MetadataRequest` | `maybeUpdate()` → `sendInternalMetadataRequest()` |
+| ③ 接收 | NetworkClient 收到 `MetadataResponse`                          | `handleSuccessfulResponse()`                      |
+| ④ 更新 | 解析响应 → 更新本地 `MetadataCache` → `version` 自增 → 通知等待线程          | `metadata.update()`                               |
 
 leastLoadedNode，即所有Node中负载最小的那一个，如何确定负载最小，即判断*InFlightRequests中还未确认的请求决定的，未确认的请求越多则认为负载越大*
 
-疑问？ 
-1. 如果配了多个nodes，会和每个node建立连接然后再取消吗？
-2. 当元数据得不到更新，发送到消息到错的leader咋没处理？
-3. 负载最小的那一个是如何找的？
+把失败分为 “可恢复” 与 “不可恢复”，采用指数回退+重试机制
+
+| 机制       | 说明                                                                                           | 相关字段/默认值           |
+|----------|----------------------------------------------------------------------------------------------|--------------------|
+| **指数回退** | 失败后在 `refreshBackoffMs`（默认 100 ms）基础上指数级推迟下一次重试                                              | `refreshBackoffMs` |
+| **失败标记** | 调用 `metadata.failedUpdate(now)` 仅更新 `lastRefreshMs`，不更新 `lastSuccessfulRefreshMs`，因此仍被视为“过期” | `failedUpdate()`   |
+| **重试循环** | Sender 线程在下一次 `poll()` 时再次挑选可用节点重发请求，循环直到成功                                                  | `maybeUpdate()`    |
+| **超时兜底** | 主线程在 `max.block.ms`（默认 60 s）内等不到有效元数据则抛 `TimeoutException` 给调用方                              | `max.block.ms`     |
+| **异常传递** | 不可恢复错误（如 `TopicAuthorizationException`）立即抛出，不再重试                                             | `waitOnMetadata()` |
 
 **client网络层**
 
-![client元数据更新](../images/client元数据更新.png)
+<p>
+<img src="../images/client元数据更新.png" alt="client元数据更新" width="600" height="150"/>
+</p>
 
 wakeup()方法用于唤醒在select()或select(long)方法调用中被阻塞的线程。当selector上的channel无就绪事件时，如果想要唤醒阻塞在select()操作上的线程去处理一些别的工作，可以调用wakeup()方法
 
-![wakeup](../images/wakeup.png)
+<p>
+<img src="../images/wakeup.png" alt="wakeup" width="600" height="100"/>
+</p>
 
 多路复用器获取的是**事件**而不是读取数据, read的情况下首先产生的是事件，然后selector再处理
 
-写事件不需要注册，依赖send-queue ， 数据准备好之后，再注册写事件，wakeup马上发送数据 --- 这个再看下
+写事件不需要注册，依赖send-queue，数据准备好之后，再注册写事件，wakeup马上发送数据
+
+producer不是单Reactor单线程；是一个后台 I/O 线程（Sender） + 一个 Java NIO Selector，但业务线程（KafkaProducer 主线程）与I/O 线程分离
+```Text
+Sender 线程
+   │
+   ├─ produce response 解析完成
+   └─ 把batch丢进completed队列
+        ▲
+        │  投递
+        │
+KafkaProducer 主线程
+   │
+   ├─ send()/flush()/close()/get()
+   └─ runCompletedCallbacks()
+        └─ 遍历 completed → 真正执行用户 Callback
+```
+
+主线程不监听队列，而是每次自己动（send、flush、close、get）时，主动去拉accum.completed()并立即执行；Sender线程只负责“把回调塞进completed队列
+
+- 处理粘包和拆包？
 
 https://www.cnblogs.com/longfurcat/p/18664750
 
 https://blog.csdn.net/qq_33204709/article/details/137098027
 
-- 处理粘包和拆包？
-
 - Java生产者是如何管理TCP连接的？
+
+- 多线程客户端
+
+- reactor
+
+https://blog.csdn.net/weixin_43767015/article/details/120303920
 
 #### 应用
 
@@ -309,12 +366,13 @@ https://blog.csdn.net/qq_33204709/article/details/137098027
       - 设置replication.factor>= 3，目前防止消息丢失的主要机制就是冗余
       - unclean.leader.election.enable=false。控制哪些Broker有资格竞选分区的Leader。不允许一个Broker落后原先的Leader太多当Leader，
 
-
 ### 3.2 Server请求处理模块
 
 整体架构:
 
-![SocketServer](SocketServer.png)
+<p>
+<img src="../images/SocketServer.png" alt="SocketServer" width="900" height="600"/>
+</p>
 
 KafkaServer.startup()初始化各个组件, 包括kafkaController，groupCoordinator等,初始化和请求处理模块使用SocketServer.startup
 
