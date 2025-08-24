@@ -159,7 +159,7 @@ Kafka还没有成熟的时候，把数据分成批处理层和实时处理层是
 RecordAccumulator主要用来缓存消息以便Sender线程可以批量发送，进而减少网络传输的资源消耗以提升性能
 
 <p>
-<img src="../images/RecodeAccumulator.png" alt="RecodeAccumulator" width="600" height="150"/>
+<img src="../images/RecodeAccumulator.png" alt="RecodeAccumulator" width="600" height="600"/>
 </p>
 
 
@@ -301,13 +301,13 @@ leastLoadedNode，即所有Node中负载最小的那一个，如何确定负载�
 **client网络层**
 
 <p>
-<img src="../images/client元数据更新.png" alt="client元数据更新" width="600" height="150"/>
+<img src="../images/client元数据更新.png" alt="client元数据更新" width="600" height="500"/>
 </p>
 
 wakeup()方法用于唤醒在select()或select(long)方法调用中被阻塞的线程。当selector上的channel无就绪事件时，如果想要唤醒阻塞在select()操作上的线程去处理一些别的工作，可以调用wakeup()方法
 
 <p>
-<img src="../images/wakeup.png" alt="wakeup" width="600" height="100"/>
+<img src="../images/wakeup.png" alt="wakeup" width="600" height="300"/>
 </p>
 
 多路复用器获取的是**事件**而不是读取数据, read的情况下首先产生的是事件，然后selector再处理
