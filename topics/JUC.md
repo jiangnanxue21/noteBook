@@ -2,7 +2,7 @@
 
 ## 1. 基础概念的问题
 
-#### 线程的创建
+#### 线程的创建--- 据说有五种？？
 
 - 继承Thread类 重写run方法
 
@@ -12,6 +12,7 @@
 - 配合FutureTask。实现Callable 重写call方法
 
 ##### interrupt方式
+interrupt 、interrupted和isInterrupted
 
 共享变量方式
 
@@ -133,7 +134,7 @@ public static void main(String[] args) throws InterruptedException {
 }
 ```
 
-Doug Lea在CAS的基础上帮助我们实现了一些原子类，其中就包括现在看到的AtomicInteger，还有其他很多原子类……
+Doug Lea在CAS的基础上实现了一些原子类，其中就包括现在看到的AtomicInteger，还有其他很多原子类……
 
 **CAS的缺点**：CAS只能保证对一个变量的操作是原子性的，无法实现对多行代码实现原子性。
 
@@ -141,7 +142,7 @@ Doug Lea在CAS的基础上帮助我们实现了一些原子类，其中就包括
 
 * **ABA问题**：问题如下，可以引入版本号的方式，来解决ABA的问题。Java中提供了一个类在CAS时，针对各个版本追加版本号的操作。 AtomicStampeReference![image.png](https://fynotefile.oss-cn-zhangjiakou.aliyuncs.com/fynote/fyfile/2746/1654095150060/1a90706738b3476d81d038d2648d3c7c.png)
 * AtomicStampedReference在CAS时，不但会判断原值，还会比较版本信息。
-* ```java
+ ```java
   public static void main(String[] args) {
       AtomicStampedReference<String> reference = new AtomicStampedReference<>("AAA",1);
 
@@ -159,7 +160,81 @@ Doug Lea在CAS的基础上帮助我们实现了一些原子类，其中就包括
    * 可以指定CAS一共循环多少次，如果超过这个次数，直接失败/或者挂起线程。（自旋锁、自适应自旋锁）
    * 可以在CAS一次失败后，将这个操作暂存起来，后面需要获取结果时，将暂存的操作全部执行，再返回最后的结果。
 
+#### Lock锁
+
+Lock锁是在JDK1.5由Doug Lea研发的，他的性能相比synchronized在JDK1.5的时期，性能好了很多，
+但是在JDK1.6对synchronized优化之后，性能相差不大，但是如果涉及并发比较多时，推荐ReentrantLock锁，性能会更好。
+
+> synchronized的优化后面会总结
+
+#### ThreadLocal
+
+ThreadLocal保证原子性的方式，是不让多线程去操作**临界资源**，让每个线程去操作属于自己的数据
+
+* 每个Thread中都存储着一个成员变量，ThreadLocalMap
+   ```Text
+    ThreadLocal.ThreadLocalMap threadLocals = null;
+   ```
+
+* ThreadLocal本身不存储数据，像是一个工具类，基于ThreadLocal去操作ThreadLocalMap
+   ```Text
+   ThreadLocal<String> threadLocal1 = new ThreadLocal<>();
+   threadLocal.set("test");   
+   ThreadLocal<String> threadLocal2 = new ThreadLocal<>();
+   threadLocal.set("test");
+   
+    public void set(T value) {
+        Thread t = Thread.currentThread();
+        ThreadLocalMap map = getMap(t);
+        if (map != null) {
+            map.set(this, value);
+        } else {
+            createMap(t, value);
+        }
+    }
+   ```
+
+![threadLocal.png](threadLocal.png)
+
+* ThreadLocalMap本身就是基于Entry[]实现的，因为一个线程可以绑定多个ThreadLocal，这样一来，可能需要存储多个数据，所以采用Entry[]的形式实现。
+
+  用法的话就是参见上面的threadLocal,  如果是要定义多个threadLocal，也是绑定在同一个线程
+
+* 每一个现有都自己独立的ThreadLocalMap，再基于ThreadLocal对象本身作为key，对value进行存取
+* ThreadLocalMap的key是一个**弱引用**，弱引用的特点是，即便有弱引用，在GC时，也必须被回收。这里是为了在ThreadLocal对象失去引用后，如果key的引用是强引用，会导致ThreadLocal对象无法被回收
+
+   ```Java
+   static class Entry extends WeakReference<ThreadLocal<?>> {
+      /** The value associated with this ThreadLocal. */
+      Object value;
+   
+      Entry(ThreadLocal<?> k, Object v) {
+          super(k);
+          value = v;
+      }
+   }
+   ```
+   为什么是个弱引用呢？如果方法执行完成了,t1,t2弹栈走了，theadLocalMap里面的key还指向着tl1,tl2，如果是强引用，则不会被回收
+
+* 如果ThreadLocal引用丢失，key因为弱引用会被GC回收掉，如果同时线程还没有被回收，内存中的value无法被回收，就会导致内存泄漏，同时也无法被获取到。
+只需要在使用完毕ThreadLocal对象之后，及时的调用remove方法，移除Entry即可
+
+> 弱引用是解决key的内存泄露的问题，remove是解决value的泄露的问题
+
+### 2.2 可见性
+
+#### 什么是可见性
+
+现在CPU都是多核，每个线程的工作内存（CPU三级缓存）都是独立的，
+会告知每个线程中做修改时，只改自己的工作内存，没有及时的同步到主内存，导致数据不一致问题。
+
+
 ## 3. 锁
+
+
+
+
+
 ## 4. 阻塞队列
 
 ![](../images/blockingQueue.png)
