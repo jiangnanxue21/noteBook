@@ -346,26 +346,6 @@ https://blog.csdn.net/qq_33204709/article/details/137098027
 
 https://blog.csdn.net/weixin_43767015/article/details/120303920
 
-#### 应用
-
-1. 无消息丢失配置怎么实现？
-
-   一句话概括，Kafka 只对“已提交”的消息（committed message）做有限度的持久化保证
-   
-   “消息丢失”案例
-   1. 生产者端
-      - 设置acks=all。代表了对“已提交”消息的定义
-      - Producer要使用带有回调通知producer.send(msg,callback)的发送API，不要使用producer.send(msg)
-        。一旦出现消息提交失败的情况，可以有针对性地进行处理
-      - 设置retries为一个较大的值。当出现网络的瞬时抖动时，消息发送可能会失败，此时配置了retries > 0的Producer
-        能够自动重试消息发送，避免消息丢失
-   2. 消费者端
-      - 维持先消费消息，再更新位移
-      - enable.auto.commit=false，手动提交位移
-   3. broker端
-      - 设置replication.factor>= 3，目前防止消息丢失的主要机制就是冗余
-      - unclean.leader.election.enable=false。控制哪些Broker有资格竞选分区的Leader。不允许一个Broker落后原先的Leader太多当Leader，
-
 ### 3.2 Server请求处理模块
 
 整体架构:
@@ -807,7 +787,7 @@ val topicDeletionManager = new TopicDeletionManager(config, controllerContext, r
 def isActive: Boolean = activeControllerId == config.brokerId
 ```
 
-![controller处理event](controller处理event.png)
+![controller处理event](../images/controller处理event.png)
 
 以处理controller Startup event为例：
 
@@ -1079,15 +1059,13 @@ take方法的实现
  }
 ```
 
-
-![zk临时节点.png](zk临时节点.png)
+![zk临时节点.png](../images/zk临时节点.png)
 
 基于这种临时节点的机制，Controller 定义了 BrokerChangeHandler 监听器，专门负责监听 /brokers/ids 下的子节点数量变化。
 一旦发现新增或删除 Broker，/brokers/ids 下的子节点数目一定会发生变化。这会被 Controller 侦测到，进而触发 BrokerChangeHandler 的处理方法，即 handleChildChange 方法。
 
 
 config.brokerId：静态的配置文件
-
 
 /**
 * Returns true if this broker is the current controller.
@@ -1164,3 +1142,122 @@ broker咋确定自己是不是Controller，成为Controller的成本
 ```
 
 MetadataCache
+
+## 3.5 Consumer
+
+- coordinator
+- kafka是如何分配GroupConndinator， 如果GroupConndinator承载的broker挂了，咋么办
+- 需要leader来分配分区
+- 分配策略*
+- offset是如何持久化的
+- 消费的时候，同步，异步，性能优化(IOthreads-workerthread)的如何做的
+
+为什么不能让多个consumer去消费一个partition，是因为要保证**数据的有序**
+
+## 3.6 日志模块
+
+数据库在内部使用了一个仅追加（append-only）的数据文件。有很多的情况需要考虑，如并发控制，回收磁盘空间以避免日志无限增长，处理错误与部分写入的记录为了高效查找数据库中特定键的值，我们需要**索引**
+
+### 3.6.1 哈希索引
+
+保留一个内存中的哈希映射，其中每个键都映射到一个数据文件中的字节偏移量，指明了可以找到对应值的位置，当将新的键值对追加写入文件中时，还要更新散列映射，以反映刚刚写入的数据的偏移量。
+查找一个值时，使用哈希映射来查找数据文件中的偏移量，寻找该位置并读取该值
+
+局限性:
+1. 哈希表必须能放进内存
+2. 不支持范围查询
+
+#### 工程实践
+
+- 将日志分为特定大小的段
+
+  当日志增长到特定大小时关闭当前段文件，并开始写入一个新的段文件，也可以对这些段进行compaction
+
+- 文件格式
+- 删除记录
+
+  如果要删除一个键及其关联的值，则必须在数据文件（有时称为逻辑删除）中附加一个特殊的删除记录。当日志段被合并时，逻辑删除告诉合并过程放弃删除键的任何以前的值
+
+- 崩溃恢复
+
+  如果数据库重新启动，则内存散列映射将丢失。原则上，您可以通过从头到尾读取整个段文件并在每次按键时注意每个键的最近值的偏移量来恢复每个段的哈希映射。如果段文件很大可能需要很长时间
+
+- 部分写入记录
+
+  数据库可能随时崩溃，包括将记录附加到日志中途。校验和，允许检测和忽略日志的这些损坏部分
+
+- 并发控制
+
+  由于写操作是以严格顺序的顺序附加到日志中的，所以常见的实现选择是只有一个写入器线程。数据文件段是附加的，否则是不可变的，所以它们可以被多个线程同时读取
+
+#### 为什么不更新文件，用新值覆盖旧值？
+
+1. 追加和分段合并是顺序写入操作
+2. 如果段文件是附加的或不可变的，并发和崩溃恢复就简单多了,不必担心在覆盖值时发生崩溃的情况，而将包含旧值和新值的一部分的文件保留在一起
+
+#### 3.6.2 kafka日志模块
+
+kafka的索引和哈希索引还不太一样，因为不是以key为hash构建的，能够支持范围查找
+
+##### 格式
+
+Kafka中每一个分区副本都对应一个Log，而Log又可以分为多个日志分段
+
+![kafka日志关系.png](../images/kafka日志关系.png)
+
+![kafka偏移量索引.png](../images/kafka偏移量索引.png)
+
+kafka对于日志的注释写的很详细:
+```
+A segment of the log. Each segment has two components: a log and an index. The log is a FileRecords containing
+the actual messages. The index is an OffsetIndex that maps from logical offsets to physical file positions. Each
+segment has a base offset which is an offset <= the least offset of any message in this segment and > any offset in
+any previous segment.
+
+A segment with a base offset of [base_offset] would be stored in two files, a [base_offset].index and a [base_offset].log file.
+```
+
+日志有两个重要的模块：log和index，下面对这两块分别记录下看下它们是如何实现的
+
+## 3.7 事务
+
+> kafka的事务的边界指的是**生产侧**
+
+### 幂等性
+
+在**分区级别**保证了同一PID、同一Epoch下的消息批次严格按序、仅持久化一次，从而兑现幂等承诺。
+**这个承诺是只对“已提交”的消息（committed message）**
+
+#### 无消息丢失配置怎么实现？
+
+一句话概括，Kafka只对“已提交”的消息（committed message）做**有限度**的持久化保证
+
+“消息丢失”案例
+1. 生产者端
+    - 设置acks=all。代表了对“已提交”消息的定义
+    - Producer要使用带有回调通知producer.send(msg,callback)的发送API，不要使用producer.send(msg)。一旦出现消息提交失败的情况，可以有针对性地进行处理
+    - 设置retries为一个较大的值。当出现网络的瞬时抖动时，消息发送可能会失败，配置了retries>0的Producer能够自动重试消息发送，避免消息丢失
+2. 消费者端
+    - 维持先消费消息，再更新位移
+    - enable.auto.commit=false，手动提交位移
+3. broker端
+    - 设置replication.factor>= 3，目前防止消息丢失的主要机制就是冗余
+    - unclean.leader.election.enable=false。控制哪些Broker有资格竞选分区的Leader。不允许一个Broker落后原先的Leader太多当Leader
+
+但是在一些情况下，可能会导致数据重复，比如：网络请求延迟等导致的重试操作，在发送请求重试时Server端并不知道这条请求是否已经处理（没有记录之前的状态信息），
+所以就会有可能导致数据请求的重复发送，这是Kafka自身的机制（异常时请求重试机制）导致的数据重复
+
+![kafka幂等性发送数据.png](../images/kafka幂等性发送数据.png)
+
+kafka的幂等性是同一个partition的维度，所以通过<Producer ID, sequence number>来唯一标识：
+
+**看具体的代码之前，就有了三个问题**
+1. Producer ID是如何申请以及来保证唯一的？
+2. server端是如何去重的？
+3. 发送失败的时候，sequence number是如何保证连续的？
+
+**问题1： Producer ID是如何申请以及来保证唯一的？**
+
+Client通过向Server发送一个InitProducerIdRequest请求获取PID，在幂等性的情况下，直接通过ProducerIdManager的generateProducerId()方法产生一个PID，
+- 在本地的PID端用完了或者处于新建状态时，申请PID段（默认情况下，每次申请1000个PID）
+- TransactionCoordinator 对象通过 generateProducerId方法获取下一个可以使用的PID

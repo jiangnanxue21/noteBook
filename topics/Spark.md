@@ -1,6 +1,6 @@
 # Spark
 
-![spark架构.png](spark架构.png)
+![spark架构.png](../images/spark架构.png)
 
 ## 1. 论文
 
@@ -17,7 +17,7 @@ Resilient Distributed Datasets: A Fault-Tolerant Abstraction for In-Memory Clust
 
 首先看下MapReduce的瓶颈在哪里：
 
-![mapreduce.png](mapreduce.png)
+![mapreduce.png](../images/mapreduce.png)
 
 Map函数的输出结果会输出到所在节点的本地硬盘上。Reduce函数会从Map函数所在的节点里拉取它所需要的数据，然后再写入本地
 
@@ -47,7 +47,7 @@ RDD 实际调用 persistent 函数的时候，这个 RDD 才会实际作为一�
 一旦被缓存到内存里，这个 RDD 就能够再次被下游的其他数据转换反复使用。一方面，这个数据不需要写入到硬盘，所以我们减少了一次数据写。另一方面，下游的其他转化也不需要再从硬盘读数据，于是，我们就节省了大量的硬盘
 I/O 的开销。
 
-![sparkRDDDemo.png](sparkRDDDemo.png)
+![sparkRDDDemo.png](../images/sparkRDDDemo.png)
 
 RDD的设计也可以对应到惰性求值（Lazy-Evaluation）和数据库里的视图
 
@@ -88,7 +88,7 @@ Internally, each RDD is characterized by five main properties:
 
   如果一个RDD的一个分区，会影响到下游的多个节点，对应的多个下游节点，都需要重新从这个节点拉取数据并重新计算，需要占用更多的网络带宽和计算资源
 
-![spark依赖.png](spark依赖.png)
+![spark依赖.png](../images/spark依赖.png)
 
 论文里提到，除了对 RDD 持久化之外，我们还可以自己定义 RDD 如何进行分区，并且提到了可以对存储优化有用，比如把两个需要 Join
 操作的数据集进行相同的哈希分区。那么，为什么这么做会对存储优化有用呢？它在应用层面到底优化了什么？
@@ -97,7 +97,7 @@ Internally, each RDD is characterized by five main properties:
 
 ### 2.1 基本术语
 
-![术语.png](术语.png)
+![术语.png](../images/术语.png)
 
 - Application: 一个分布式计算程序,1个app：1个job
 
@@ -157,15 +157,15 @@ object WordCountScala {
  res.foreach(println)
 ```
 
-![sparkJob.png](sparkJob.png)
+![sparkJob.png](../images/sparkJob.png)
 
 stage和stage中间是shuffle
 
-![sparkDetailJob.png](sparkDetailJob.png)
+![sparkDetailJob.png](../images/sparkDetailJob.png)
 
 为什么是灰色还有skipped？RDD数据集复用
 
-![sparkJob1.png](sparkJob1.png)
+![sparkJob1.png](../images/sparkJob1.png)
 
 ## wordCount源码分析
 
@@ -491,13 +491,13 @@ ShuffleMapTask的write和read方法
 
 RDD的类型如下：
 
-![RDD类型.png](RDD类型.png)
+![RDD类型.png](../images/RDD类型.png)
 
 RDD的依赖关系如下：
 
 其中NarrowDependency的关系是1:1或者是n:1的
 
-![RDD依赖关系.png](RDD依赖关系.png)
+![RDD依赖关系.png](../images/RDD依赖关系.png)
 
 ## Spark算子
 
@@ -584,7 +584,7 @@ Spark算子在有些情况下使用会有问题，比如mapPartitionsWithIndex�
 
 这个问题在哪里呢？假如数据是1T，内存只有10G，则每条数据都会先放入ListBuffer，导致内存溢出
 
-![spark外联sql_v2.png](spark外联sql_v2.png)
+![spark外联sql_v2.png](../images/spark外联sql_v2.png)
 
 版本2：构造自己的一个迭代器
 ```Scala
