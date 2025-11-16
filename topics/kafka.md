@@ -940,8 +940,53 @@ private def elect(): Unit = {
 }
 ```
 
-### 3.4 副本管理模块
+**创建新的topic之后，集群如何处理?**
 
+controller选举成功之后，会在onControllerFailover中注册topicChangeHandler，当zk的topic注册的时候，处理此Handler
+
+```Scala
+class TopicChangeHandler(eventManager: ControllerEventManager) extends ZNodeChildChangeHandler {
+  override val path: String = TopicsZNode.path
+
+  override def handleChildChange(): Unit = eventManager.put(TopicChange)
+}
+```
+
+对应的代码如下：
+```Scala
+ private def processTopicChange(): Unit = {
+    if (!isActive) return
+    val topics = zkClient.getAllTopicsInCluster(true)
+    // zk的topic为准，而controllerContext是kafka集群的缓存
+    val newTopics = topics -- controllerContext.allTopics
+    val deletedTopics = controllerContext.allTopics.diff(topics)
+    controllerContext.setAllTopics(topics)
+
+    // 注册了新的topic的回调，被删除会继续感知
+    registerPartitionModificationsHandlers(newTopics.toSeq)
+    val addedPartitionReplicaAssignment = zkClient.getReplicaAssignmentAndTopicIdForTopics(newTopics)
+    deletedTopics.foreach(controllerContext.removeTopic)
+    processTopicIds(addedPartitionReplicaAssignment)
+
+    addedPartitionReplicaAssignment.foreach { case TopicIdReplicaAssignment(_, _, newAssignments) =>
+      newAssignments.foreach { case (topicAndPartition, newReplicaAssignment) =>
+        controllerContext.updatePartitionFullReplicaAssignment(topicAndPartition, newReplicaAssignment)
+      }
+    }
+    info(s"New topics: [$newTopics], deleted topics: [$deletedTopics], new partition replica assignment " +
+      s"[$addedPartitionReplicaAssignment]")
+    if (addedPartitionReplicaAssignment.nonEmpty) {
+      val partitionAssignments = addedPartitionReplicaAssignment
+        .map { case TopicIdReplicaAssignment(_, _, partitionsReplicas) => partitionsReplicas.keySet }
+        .reduce((s1, s2) => s1.union(s2))
+      onNewPartitionCreation(partitionAssignments)
+    }
+  }
+```
+
+
+
+### 3.4 副本管理模块
 
 
 
