@@ -14,7 +14,6 @@
 
 memgpt把空间分成两个部分：main context (analogous to main memory/physical memory/RAM)and external context (analogous to disk memory/disk storage).
 
-**main context*
 ![memgpt.png](../images/memgpt.png)
 
 MemGPT provides function calls that the LLM processor to manage its own memory without any user intervention.
@@ -79,11 +78,11 @@ memgpt是由事件触发LLM推理，可以是：
 
 2. 通过alembic创建表
 
-   uv run alembic upgrade head
+    uv run alembic upgrade head
 
 3. 配置环境变量
 
-    配置环境变量$LETTA_PG_URI=postgresql+pg8000://<usr>:<password>@<ip>:5432/letta
+    配置环境变量$LETTA_PG_URI=postgresql+pg8000://{user}:{password}@{ip}:5432/letta
 
 4. llm配置
 
@@ -141,7 +140,7 @@ POST http://localhost:8283/v1/agents/{agent-id}/messages
     "messages": [
         {
             "role": "user",
-            "content": "我不叫小明，我叫薛大屁"
+            "content": "我不叫小明，我叫阿里巴巴"
         }
     ],
     "stream": false
