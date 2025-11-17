@@ -4,9 +4,9 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="f4904cd4-1e73-4808-90e5-c91a890ae80b" name="Changes" comment="更新kafka和记忆体">
+    <list default="true" id="f4904cd4-1e73-4808-90e5-c91a890ae80b" name="Changes" comment="更新记忆体">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/topics/记忆体Letta.md" beforeDir="false" afterPath="$PROJECT_DIR$/topics/记忆体Letta.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/topics/kafka.md" beforeDir="false" afterPath="$PROJECT_DIR$/topics/kafka.md" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -197,7 +197,7 @@
       <workItem from="1755400793110" duration="3411000" />
       <workItem from="1755931659909" duration="20921000" />
       <workItem from="1762666279478" duration="3711000" />
-      <workItem from="1763081002778" duration="20742000" />
+      <workItem from="1763081002778" duration="23960000" />
     </task>
     <task id="LOCAL-00001" summary="kafka更新">
       <option name="closed" value="true" />
@@ -271,7 +271,15 @@
       <option name="project" value="LOCAL" />
       <updated>1763299735309</updated>
     </task>
-    <option name="localTasksCounter" value="10" />
+    <task id="LOCAL-00010" summary="更新记忆体">
+      <option name="closed" value="true" />
+      <created>1763338130010</created>
+      <option name="number" value="00010" />
+      <option name="presentableId" value="LOCAL-00010" />
+      <option name="project" value="LOCAL" />
+      <updated>1763338130010</updated>
+    </task>
+    <option name="localTasksCounter" value="11" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -296,6 +304,7 @@
     <MESSAGE value="更新" />
     <MESSAGE value="更新kafka" />
     <MESSAGE value="更新kafka和记忆体" />
-    <option name="LAST_COMMIT_MESSAGE" value="更新kafka和记忆体" />
+    <MESSAGE value="更新记忆体" />
+    <option name="LAST_COMMIT_MESSAGE" value="更新记忆体" />
   </component>
 </project>

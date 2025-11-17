@@ -687,84 +687,58 @@ Controller在ZooKeeper的帮助下管理和协调整个Kafka
 
 4. 元数据的处理方式
 
-#### **源码实现**
-Controller承载了ZooKeeper上的所有元数据，所以先看zk的初始化
-
-初始化zk，并且创建目录
-```Scala
-initZkClient(time)
-
-private def initZkClient(time: Time): Unit = {
-   // ..............
-   // 创建zk目录
-   _zkClient.createTopLevelPaths()
-
-   // These are persistent ZK paths that should exist on kafka broker startup.
-   val PersistentZkPaths = Seq(
-      ConsumerPathZNode.path, // old consumer path
-      BrokerIdsZNode.path,
-      TopicsZNode.path,
-      ConfigEntityChangeNotificationZNode.path,
-      DeleteTopicsZNode.path,
-      BrokerSequenceIdZNode.path,
-      IsrChangeNotificationZNode.path,
-      ProducerIdBlockZNode.path,
-      LogDirEventNotificationZNode.path
-   ) ++ ConfigType.all.map(ConfigEntityTypeZNode.path)
-}
-```
-
-checkedEphemeralCreate创建临时节点
-
-```Scala
-val brokerInfo = createBrokerInfo
-val brokerEpoch = zkClient.registerBroker(brokerInfo)
-
-def registerBroker(brokerInfo: BrokerInfo): Long = {
-   val path = brokerInfo.path
-   val stat = checkedEphemeralCreate(path, brokerInfo.toJsonBytes)
-   info(s"Registered broker ${brokerInfo.broker.id} at path $path with addresses: " +
-           s"${brokerInfo.broker.endPoints.map(_.connectionString).mkString(",")}, czxid (broker epoch): ${stat.getCzxid}")
-   stat.getCzxid
-}
-```
-
-临时节点的作用：如ZooKeeper中/controller节点
-
-```Text
-{"version":1,"brokerid":0,"timestamp":"1585098432431"}
-cZxid = 0x1a
-ctime = Wed Mar 25 09:07:12 CST 2020
-mZxid = 0x1a
-mtime = Wed Mar 25 09:07:12 CST 2020
-pZxid = 0x1a
-cversion = 0
-dataVersion = 0
-aclVersion = 0
-ephemeralOwner = 0x100002d3a1f0000
-dataLength = 54
-numChildren = 0
-```
-一旦 Broker 与 ZooKeeper 的会话终止，该节点就会消失
-- Controller Broker Id是0，表示序号为0的Broker是集群Controller
-- ephemeralOwner字段不是 0x0，说明这是一个临时节点
-
-一旦Broker与ZooKeeper的会话终止，该节点就会消失，产生**event事件**
-
-![zk监听](../images/zk监听.png)
-
-新的kafka源码把多线程的方案改成了单线程加事件队列的方案
+**从下面3个方面来看Controller相关功能的源码实现:**
+1. Controller的初始化和选举，其中包括了如何处理事件event
+2. ControllerChannelManager：维护Controller到所有Broker的Socket连接、把请求批量发出去、把响应收回来，属于**通信层**
+3. kafka新建topic的时候，controller是如何操作的，包括了MetaData,ReplicaStateMachine和PartitionStateMachine
 
 Controller是在KafkaServer.scala#startup中初始化并且启动的
 
 ```Scala
 /* start kafka controller */
-kafkaController = new KafkaController(config, zkClient, time, metrics, brokerInfo, brokerEpoch, tokenManager, brokerFeatures, featureCache, threadNamePrefix)
+kafkaController = new KafkaController(config, zkClient, time, metrics,
+  brokerInfo, brokerEpoch, tokenManager, brokerFeatures, featureCache, threadNamePrefix)
 kafkaController.startup()
+
+// KafkaController.scala
+private[controller] val eventManager = new ControllerEventManager(config.brokerId, this, time,
+  controllerContext.stats.rateAndTimeMetrics)
+def startup() = {
+  // 第1步：注册ZooKeeper状态变更监听器，它是用于监听Zookeeper会话过期的
+  zkClient.registerStateChangeHandler(new StateChangeHandler {
+    override val name: String = StateChangeHandlers.ControllerHandler
+
+    override def afterInitializingSession(): Unit = {
+      eventManager.put(RegisterBrokerAndReelect)
+    }
+
+    override def beforeInitializingSession(): Unit = {
+      val queuedEvent = eventManager.clearAndPut(Expire)
+      queuedEvent.awaitProcessing()
+    }
+  })
+
+  // 第2步：写入Startup事件到事件队列
+  eventManager.put(Startup)
+
+  // 第3步：启动ControllerEventThread线程，开始处理事件队列中的ControllerEvent
+  eventManager.start()
+}
 ```
+
+涉及以下几个类：
+- ControllerEventProcessor：Controller端的事件处理器接口。
+- ControllerEvent：Controller事件，也就是事件队列中被处理的对象。
+- ControllerEventManager：事件处理器，用于创建和管理ControllerEventThread。
+- ControllerEventThread：专属的事件处理线程，唯一的作用是处理不同种类的ControllEvent。这个类是ControllerEventManager类内部定义的线程类
+
+
+
+
+
 比较主要的几个参数
 ```Scala
-// 
+// 维护Controller到所有Broker的网络
 var controllerChannelManager = new ControllerChannelManager(controllerContext, config, time, metrics,
    stateChangeLogger, threadNamePrefix)
 
@@ -798,25 +772,7 @@ def isActive: Boolean = activeControllerId == config.brokerId
 ```Scala
 kafkaController.startup()
 
-def startup() = {
-   // 第1步：注册ZooKeeper状态变更监听器，它是用于监听Zookeeper会话过期的
-   zkClient.registerStateChangeHandler(new StateChangeHandler {
-      override val name: String = StateChangeHandlers.ControllerHandler
-      override def afterInitializingSession(): Unit = {
-         eventManager.put(RegisterBrokerAndReelect)
-      }
 
-      override def beforeInitializingSession(): Unit = {
-         val queuedEvent = eventManager.clearAndPut(Expire)
-         queuedEvent.awaitProcessing()
-      }
-   })
-
-   // 第2步：写入Startup事件到事件队列
-   eventManager.put(Startup)
-
-   // 第3步：启动ControllerEventThread线程，开始处理事件队列中的ControllerEvent
-   eventManager.start()
 }
 ```
 
@@ -939,6 +895,82 @@ private def elect(): Unit = {
   kafkaScheduler.startup()
 }
 ```
+
+
+
+
+
+
+Controller承载了ZooKeeper上的所有元数据，所以先看zk的初始化
+
+初始化zk，并且创建目录
+```Scala
+initZkClient(time)
+
+private def initZkClient(time: Time): Unit = {
+   // ..............
+   // 创建zk目录
+   _zkClient.createTopLevelPaths()
+
+   // These are persistent ZK paths that should exist on kafka broker startup.
+   val PersistentZkPaths = Seq(
+      ConsumerPathZNode.path, // old consumer path
+      BrokerIdsZNode.path,
+      TopicsZNode.path,
+      ConfigEntityChangeNotificationZNode.path,
+      DeleteTopicsZNode.path,
+      BrokerSequenceIdZNode.path,
+      IsrChangeNotificationZNode.path,
+      ProducerIdBlockZNode.path,
+      LogDirEventNotificationZNode.path
+   ) ++ ConfigType.all.map(ConfigEntityTypeZNode.path)
+}
+```
+
+checkedEphemeralCreate创建临时节点
+
+```Scala
+val brokerInfo = createBrokerInfo
+val brokerEpoch = zkClient.registerBroker(brokerInfo)
+
+def registerBroker(brokerInfo: BrokerInfo): Long = {
+   val path = brokerInfo.path
+   val stat = checkedEphemeralCreate(path, brokerInfo.toJsonBytes)
+   info(s"Registered broker ${brokerInfo.broker.id} at path $path with addresses: " +
+           s"${brokerInfo.broker.endPoints.map(_.connectionString).mkString(",")}, czxid (broker epoch): ${stat.getCzxid}")
+   stat.getCzxid
+}
+```
+
+临时节点的作用：如ZooKeeper中/controller节点
+
+```Text
+{"version":1,"brokerid":0,"timestamp":"1585098432431"}
+cZxid = 0x1a
+ctime = Wed Mar 25 09:07:12 CST 2020
+mZxid = 0x1a
+mtime = Wed Mar 25 09:07:12 CST 2020
+pZxid = 0x1a
+cversion = 0
+dataVersion = 0
+aclVersion = 0
+ephemeralOwner = 0x100002d3a1f0000
+dataLength = 54
+numChildren = 0
+```
+一旦 Broker 与 ZooKeeper 的会话终止，该节点就会消失
+- Controller Broker Id是0，表示序号为0的Broker是集群Controller
+- ephemeralOwner字段不是 0x0，说明这是一个临时节点
+
+一旦Broker与ZooKeeper的会话终止，该节点就会消失，产生**event事件**
+
+<p>
+<img src="../images/zk监听.png" alt="zk监听" width="600" height="600"/>
+</p>
+
+
+新的kafka源码把多线程的方案改成了单线程加事件队列的方案
+
 
 **创建新的topic之后，集群如何处理?**
 
