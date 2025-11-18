@@ -699,7 +699,35 @@ Controller是在KafkaServer.scala#startup中初始化并且启动的
 kafkaController = new KafkaController(config, zkClient, time, metrics,
   brokerInfo, brokerEpoch, tokenManager, brokerFeatures, featureCache, threadNamePrefix)
 kafkaController.startup()
+```
 
+Controller单线程事件队列处理模型及其基础组件以下几个类：
+
+![controller单线程模型.png](../images/controller单线程模型.png)
+
+- ControllerEventProcessor：Controller端的事件处理器接口。
+- ControllerEvent：Controller事件，也就是事件队列中被处理的对象。
+- ControllerEventManager：事件处理器，用于创建和管理ControllerEventThread。
+- ControllerEventThread：专属的事件处理线程，唯一的作用是处理不同种类的ControllEvent。这个类是ControllerEventManager类内部定义的线程类
+
+kafkaController的startup会注册ZooKeeper状态变更监听器，以及放入一个Startp事件
+
+Startp事件的定义
+```Scala
+sealed trait ControllerEvent {
+  def state: ControllerState
+  // preempt() is not executed by `ControllerEventThread` but by the main thread.
+  def preempt(): Unit
+}
+
+case object Startup extends ControllerEvent {
+  override def state: ControllerState = ControllerState.ControllerChange
+  override def preempt(): Unit = {}
+}
+
+```
+
+```Scala
 // KafkaController.scala
 private[controller] val eventManager = new ControllerEventManager(config.brokerId, this, time,
   controllerContext.stats.rateAndTimeMetrics)
@@ -726,94 +754,44 @@ def startup() = {
 }
 ```
 
-涉及以下几个类：
-- ControllerEventProcessor：Controller端的事件处理器接口。
-- ControllerEvent：Controller事件，也就是事件队列中被处理的对象。
-- ControllerEventManager：事件处理器，用于创建和管理ControllerEventThread。
-- ControllerEventThread：专属的事件处理线程，唯一的作用是处理不同种类的ControllEvent。这个类是ControllerEventManager类内部定义的线程类
-
-
-
-
-
-比较主要的几个参数
+ControllerEventThread启动之后会从ControllerEventManager里面的queue拉取事件，然后执行相关流程
 ```Scala
-// 维护Controller到所有Broker的网络
-var controllerChannelManager = new ControllerChannelManager(controllerContext, config, time, metrics,
-   stateChangeLogger, threadNamePrefix)
+  class ControllerEventThread(name: String) extends ShutdownableThread() {
+  logIdent = s"[ControllerEventThread controllerId=$controllerId] "
 
-// 用于管理事件处理线程和事件队列
-private[controller] val eventManager = new ControllerEventManager(config.brokerId, this, time,
-   controllerContext.stats.rateAndTimeMetrics)
+  override def doWork(): Unit = {
+    val dequeued = pollFromEventQueue()
+    dequeued.event match {
+      case ShutdownEventThread => 
+      case controllerEvent =>
+        _state = controllerEvent.state
+        try {
+          // 执行定义的event事件
+          def process(): Unit = dequeued.process(processor)
 
-// 用于zk事件的处理
-private val controllerChangeHandler = new ControllerChangeHandler(eventManager)
+          rateAndTimeMetrics.get(state) match {
+            case Some(timer) => timer.time { process() }
+            case None => process()
+          }
+        } catch {
+        }
 
-// 三个状态机
-val replicaStateMachine: ReplicaStateMachine = new ZkReplicaStateMachine(config, stateChangeLogger, controllerContext, zkClient,
-   new ControllerBrokerRequestBatch(config, controllerChannelManager, eventManager, controllerContext, stateChangeLogger))
-val partitionStateMachine: PartitionStateMachine = new ZkPartitionStateMachine(config, stateChangeLogger, controllerContext, zkClient,
-   new ControllerBrokerRequestBatch(config, controllerChannelManager, eventManager, controllerContext, stateChangeLogger))
-val topicDeletionManager = new TopicDeletionManager(config, controllerContext, replicaStateMachine,
-   partitionStateMachine, new ControllerDeletionClient(this, zkClient))
-
-// Returns true if this broker is the current controller.
-def isActive: Boolean = activeControllerId == config.brokerId
-```
-
-![controller处理event](../images/controller处理event.png)
-
-以处理controller Startup event为例：
-
-**broker如何确定自己是不是controller**
-
-在kafkaController中执行startup方法，把Startup事件到事件队列，并且启动ControllerEventThread线程，开始处理事件
-
-```Scala
-kafkaController.startup()
-
-
-}
-```
-
-eventManager启动的是内部的ControllerEventThread的doWork()
-```Scala
- override def doWork(): Unit = {
-   val dequeued = pollFromEventQueue()
-   dequeued.event match {
-     case controllerEvent =>
-       _state = controllerEvent.state
-       try {
-          // dequeued是event事件
-         def process(): Unit = dequeued.process(processor)
-       } catch {
-       }
-       _state = ControllerState.Idle
-   }
- }
-```
-
-然后再回去调用具体的逻辑，对于Startup事件则匹配
-```Scala
-  override def process(event: ControllerEvent): Unit = {
-  try {
-    event match {
-      case event: MockEvent =>
-        // Used only in test cases
-        event.process()
-      case Startup =>
-        processStartup()
+        _state = ControllerState.Idle
     }
   }
 }
 ```
 
-zk注册，带了controllerChangeHandler，也就是说，响应回来就会调用controllerChangeHandler
+大致流程如下，这张图对应源码的版本比较老，新的3.x版本中event事件的process在ControllerEventProcessor中，即它的子类KafkaController匹配的
+
+![controller处理event](../images/controller处理event.png)
+
+Startup匹配到了processStartup(),zk注册带了controllerChangeHandler，也就是说，响应回来就会调用controllerChangeHandler
 ```Scala
-private def processStartup(): Unit = {
- zkClient.registerZNodeChangeHandlerAndCheckExistence(controllerChangeHandler)
- elect()
-}
+  private def processStartup(): Unit = {
+    zkClient.registerZNodeChangeHandlerAndCheckExistence(controllerChangeHandler)
+    elect()
+  }
 ```
 
 elect是选主的具体流程：
@@ -898,7 +876,35 @@ private def elect(): Unit = {
 
 
 
+比较主要的几个参数
+```Scala
+// 维护Controller到所有Broker的网络
+var controllerChannelManager = new ControllerChannelManager(controllerContext, config, time, metrics,
+   stateChangeLogger, threadNamePrefix)
 
+// 用于管理事件处理线程和事件队列
+private[controller] val eventManager = new ControllerEventManager(config.brokerId, this, time,
+   controllerContext.stats.rateAndTimeMetrics)
+
+// 用于zk事件的处理
+private val controllerChangeHandler = new ControllerChangeHandler(eventManager)
+
+// 三个状态机
+val replicaStateMachine: ReplicaStateMachine = new ZkReplicaStateMachine(config, stateChangeLogger, controllerContext, zkClient,
+   new ControllerBrokerRequestBatch(config, controllerChannelManager, eventManager, controllerContext, stateChangeLogger))
+val partitionStateMachine: PartitionStateMachine = new ZkPartitionStateMachine(config, stateChangeLogger, controllerContext, zkClient,
+   new ControllerBrokerRequestBatch(config, controllerChannelManager, eventManager, controllerContext, stateChangeLogger))
+val topicDeletionManager = new TopicDeletionManager(config, controllerContext, replicaStateMachine,
+   partitionStateMachine, new ControllerDeletionClient(this, zkClient))
+
+// Returns true if this broker is the current controller.
+def isActive: Boolean = activeControllerId == config.brokerId
+```
+
+
+
+
+**broker如何确定自己是不是controller**
 
 
 Controller承载了ZooKeeper上的所有元数据，所以先看zk的初始化
@@ -943,7 +949,6 @@ def registerBroker(brokerInfo: BrokerInfo): Long = {
 ```
 
 临时节点的作用：如ZooKeeper中/controller节点
-
 ```Text
 {"version":1,"brokerid":0,"timestamp":"1585098432431"}
 cZxid = 0x1a
