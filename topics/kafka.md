@@ -794,6 +794,27 @@ Startup匹配到了processStartup(),zk注册带了controllerChangeHandler，也�
   }
 ```
 
+上面分为两个步骤，
+```Scala
+    zkClient.registerZNodeChangeHandlerAndCheckExistence(controllerChangeHandler)
+```
+1. watch controllerChangeHandler定义的path，/controller
+2. 一旦发现变化，则根据类型匹配下面的Creation，Deletion，DataChange
+```Scala
+class ControllerChangeHandler(eventManager: ControllerEventManager) extends ZNodeChangeHandler {
+  override val path: String = ControllerZNode.path
+
+  override def handleCreation(): Unit = eventManager.put(ControllerChange)
+
+  override def handleDeletion(): Unit = eventManager.put(Reelect)
+
+  override def handleDataChange(): Unit = eventManager.put(ControllerChange)
+}
+```
+
+Creation，Deletion，DataChange分别是什么时机触发的？分别会有什么行为？
+
+
 elect是选主的具体流程：
 ```Scala
 private def elect(): Unit = {
@@ -934,7 +955,6 @@ private def initZkClient(time: Time): Unit = {
 ```
 
 checkedEphemeralCreate创建临时节点
-
 ```Scala
 val brokerInfo = createBrokerInfo
 val brokerEpoch = zkClient.registerBroker(brokerInfo)
@@ -974,10 +994,8 @@ numChildren = 0
 </p>
 
 
-新的kafka源码把多线程的方案改成了单线程加事件队列的方案
 
-
-**创建新的topic之后，集群如何处理?**
+- **创建新的topic之后，controller是如何处理的?**
 
 controller选举成功之后，会在onControllerFailover中注册topicChangeHandler，当zk的topic注册的时候，处理此Handler
 

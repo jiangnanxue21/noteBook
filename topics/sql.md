@@ -441,15 +441,104 @@ select * from t1 straight_join t2 on (t1.a=t2.a);
 
 ## 2. Mybatis
 
+### 一、全局脉络（先建立索引）
+1. 入口：SqlSessionFactory → SqlSession → Mapper接口
+2. 配置两份文件：
+    - mybatis-config.xml（全局）
+    - *Mapper.xml（SQL）
+3. 四大核心对象：Executor | StatementHandler | ParameterHandler | ResultSetHandler
+4. 三大解析器：XMLConfigBuilder | XMLMapperBuilder | XMLStatementBuilder
+5. 两级缓存 + 延迟加载 + 插件拦截链
+6. 动态 SQL 四件套：if / choose / trim / foreach
+7. 日志 + 事务 + 连接池全部委托给DataSource
+8. Spring集成后：Mapper扫描 → FactoryBean → 代理 → SqlSessionTemplate（线程安全）
+
+### 二、配置精要（必须手写三遍）
+1. environments → dataSource 类型：UNPOOLED / POOLED / JNDI
+2. settings 高频项：
+    - cacheEnabled
+    - lazyLoadingEnabled
+    - multipleResultSetsEnabled
+    - useGeneratedKeys
+    - defaultExecutorType：SIMPLE（默认）/ REUSE / BATCH
+    - mapUnderscoreToCamelCase：true 即可省掉 90% 的 resultMap
+3. typeAliases + typeHandlers：
+    - 枚举通用 EnumTypeHandler
+    - JSON 字段用 JsonTypeHandler（自定义）
+4. mappers 四种注册方式：resource / url / class / package；Spring 启动用 @MapperScan 批量扫描
+5. 数据库方言：分页靠PageHelper（物理分页 = 拦截器 + ThreadLocal保存Page对象）
+
+### 三、映射三兄弟（resultType / resultMap / sql 片段）
+1. resultType 场景：列名 = 属性名或已开启驼峰
+2. resultMap必填场景：
+    - 列名 ≠ 属性名
+    - 一对一级联
+    - 一对多级联
+    - 构造器注入
+    - 枚举/JSON 字段
+3. 级联策略：
+    - association（1:1）嵌套 select 会 N+1，推荐嵌套resultMap一次join取出
+    - collection（1:N）用 ofType 指定泛型；分页场景一定加 “嵌套 resultMap + 分页子查询”，防止内存爆炸
+4. 鉴别器：discriminator实现单表多态（例如：Payment→Alipay/WxPay子类）
+5. 可重用 sql 片段：&lt;sql id="cols"&gt;…&lt;/sql&gt; + &lt;include refid="cols"/&gt;
+
+### 四、动态SQL {id="sql_1"}
+1. if test 里OGNL可以直接调用静态方法：@com.xxx.TypeEnum@isValid(val)
+2. choose/when/otherwise = switch…case
+3. trim前缀后缀：prefix / suffix / prefixOverrides / suffixOverrides
+    - 万能where：&lt;trim prefix="where" prefixOverrides="and |or "&gt;
+4. foreach三大属性：collection / index / item / separator
+    - 批量插入：foreach 套 values，记得 allowMultiQueries=true
+5. script 注解：@Select("&lt;script&gt;…&lt;/script&gt;")，写在 Mapper 接口里，省XML
+
+### 五、# 与 $ 安全底线
+1. #{} → PreparedStatement 占位符 → 防 SQL 注入
+2. ${} → 字符串拼接 → 只能用于列名、排序字段、表名；前端传参必须白名单校验
+
+### 六、缓存
+1. 一级缓存：SqlSession级，默认开启，commit / close / flush 即失效；  
+   同线程连续查询可命中，但分布式场景下会读到脏数据 → 建议更新操作后 sqlSession.clearCache()
+2. 二级缓存：namespace 级，要求：&lt;cache/&gt; 标签 + 实体类可序列化；  
+   缓存失效策略：flushCache=true（语句级强制清空）、useCache=false（禁用二级）
+3. 分布式必关二级缓存，或者换 Redis + 自定义 Cache，版本号/广播失效
+
+### 七、延迟加载（打破 N+1）
+1. settings 开 lazyLoadingEnabled + aggressiveLazyLoading=false
+2. 触发方式：调用getter时才发SQL
+   原理：Javassist 代理实体，拦截 getter → 通过 MetaObject 再查库
+3. 陷阱：
+    - 事务已关闭会报 LazyInitializationException
+    - 在 Spring 中必须在 Service 层事务内访问
+
+### 八、插件 / 拦截器（万能改写）
+1. 签名：@Intercepts({@Signature(type=Executor.class, method="query", args=…)})
+2. 典型场景：分页、多租户字段自动拼接、读写分离、慢 SQL 统计
+3. 责任链顺序：插件 → ParameterHandler → StatementHandler → ResultSetHandler → Executor
+4. 实现步骤：实现 Interceptor → 在 mybatis-config 或 Spring 注入插件 Bean
+5. PageHelper 就是基于 Executor.query 拦截器做的
+
+### 九、批量与事务
+1. ExecutorType.BATCH：  
+   SqlSession session = sqlSessionFactory.openSession(ExecutorType.BATCH, false);  
+   每 1000 条 flushStatements() 一次，最后 commit
+2. Spring 集成：@Transactional + SqlSessionTemplate 无法切换 BATCH，  
+   需要手工注入 SqlSessionFactory，在 Service 内部 openSession(BATCH)
+3. 返回主键：useGeneratedKeys=true keyProperty="id" 批量插入后，参数对象里 id 会被回填（MySQL 支持）
+
+### 十、常见异常与排查
+1. BindingException：接口与 XML 不对应 → 检查 namespace / 方法名 / 参数
+2. TooManyResultsException：期望一条返回多条 → 换 selectOne 或 limit 1
+3. N+1：日志里瞬间多出成百上千 SQL → association 嵌套 select 导致，改为 join
+4. 缓存脏读：线上更新后查询仍旧值 → 二级缓存未失效，关或加版本
+5. 分页总数不对：PageHelper 必须紧挨 Mapper 查询语句，中间不能有任何查询
+
 ### BaseExecutor
 
 BaseExecutor是模板方法，子类只要实现四个基本方法doUpdate，doFlushStatements，doQuery，doQueryCursor
 
 ![](../images/mysql执行过程.png)
 
-
 ```
-
 # 1. SimpleExecutor
   @Test
   void testSimpleExecutor() throws Exception {
@@ -526,6 +615,135 @@ public enum LocalCacheScope {
         <setting name="localCacheScope" value="STATEMENT"/>
     </settings>
 
+```
+
+### StatementHandler
+
+StatementHandler是MyBatis四大核心对象之一，负责一条SQL语句的“真正执行过程”。
+
+拿到 BoundSql → 创建JDBC Statement → 绑定实参 → 执行SQL → 把结果集交给ResultSetHandler
+
+因此它处于 “参数处理之后、结果处理之前” 这一关键位置
+
+![statementHandler.png](../images/statementHandler.png)
+
+基本上都会用PreparedStatementHandler，防止SQL注入。
+
+```Mermaid
+sequenceDiagram
+    participant App as 业务代码
+    participant BJH as Base JDBC处理器
+    participant SH  as StatementHandler
+    participant PH  as ParameterHandler
+    participant RH  as ResultSetHandler
+
+    %% 1. 初始化阶段
+    App->>BJH: 创建 Base JDBC处理器
+    BJH->>SH:  创建 StatementHandler
+    BJH->>PH:  创建 ParameterHandler
+    BJH->>RH:  创建 ResultSetHandler
+
+    %% 2. 声明 & 创建 Statement
+    App->>SH: 声明 Statement
+    SH->>SH:  创建 Statement
+
+    %% 3. 预处理（Prepared）
+    alt 预编译 SQL
+        SH->>SH: 预处理 SQL
+        SH->>PH: 设置参数入口
+        PH->>PH: 解析并填充参数
+        PH-->>SH: 完成参数设置
+    end
+
+    %% 4. 执行
+    App->>SH: 调用 execute
+    SH->>SH: 执行 SQL
+
+    %% 5. 结果集处理
+    SH->>RH: 结果集处理
+    RH-->>SH: 返回处理后的结果
+
+    %% 6. 关闭
+    SH->>SH: 关闭 Statement
+    SH-->>App: 结束
+```
+
+在executor里面
+```Java
+  @Override
+  public <E> List<E> doQuery(MappedStatement ms, Object parameter, RowBounds rowBounds, ResultHandler resultHandler,
+      BoundSql boundSql) throws SQLException {
+    Statement stmt = null;
+    try {
+      Configuration configuration = ms.getConfiguration();
+      StatementHandler handler = configuration.newStatementHandler(wrapper, ms, parameter, rowBounds, resultHandler,
+          boundSql);
+      stmt = prepareStatement(handler, ms.getStatementLog());
+      return handler.query(stmt, resultHandler);
+    } finally {
+      closeStatement(stmt);
+    }
+  }
+```
+
+为什么要用configuration去创建StatementHandler
+1. 统一
+2. 插件拦截
+
+#### Step 1: 预处理
+
+```Java
+  private Statement prepareStatement(StatementHandler handler, Log statementLog) throws SQLException {
+    Statement stmt;
+    Connection connection = getConnection(statementLog);
+    // 创建statement
+    stmt = handler.prepare(connection, transaction.getTimeout());
+    // 参数化处理
+    handler.parameterize(stmt);
+    return stmt;
+  }
+```
+
+BaseStatementHandler是用来处理一些共性的事件
+
+```Java
+  @Override
+  public Statement prepare(Connection connection, Integer transactionTimeout) throws SQLException {
+    ErrorContext.instance().sql(boundSql.getSql());
+    Statement statement = null;
+    try {
+      statement = instantiateStatement(connection);
+      setStatementTimeout(statement, transactionTimeout);
+      setFetchSize(statement);
+      return statement;
+    } catch (Exception e) {
+        
+    }
+  }
+```
+调用抽象方法instantiateStatement
+
+#### Step 2: 参数设置
+
+
+### ResultSetHandler
+
+![ResultHandler.png](../images/ResultHandler.png)
+
+```Java
+  void resultHandlerTest() {
+    try (SqlSession sqlSession = sqlSessionFactory.openSession()) {
+        List<Object> list = new ArrayList<>();
+        ResultHandler handler = resultContext -> {
+            if (resultContext.getResultCount() == 1) {
+                resultContext.stop();
+            }
+            list.add(resultContext.getResultObject());
+        };
+        // handler就保留了一条结果
+        sqlSession.select("org.apache.ibatis.submitted.blobtest.selectAll", handler);
+    }
+}
 ```
 
 ### 动态SQL
