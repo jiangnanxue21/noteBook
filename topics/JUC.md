@@ -4,15 +4,15 @@
 
 #### 线程的创建--- 据说有五种？？
 
-- 继承Thread类 重写run方法
+- 继承Thread类，重写run方法
 
-  为什么创建线程不要直接用thread
+为什么创建线程不要直接用thread？
 
-- 实现Runnable接口 重写run方法
-- 配合FutureTask。实现Callable 重写call方法
+- 实现Runnable接口重写run方法
+- 配合FutureTask。实现Callable重写call方法
 
 ##### interrupt方式
-interrupt 、interrupted和isInterrupted
+interrupt、interrupted和isInterrupted
 
 共享变量方式
 

@@ -23,7 +23,7 @@
 
    Kafka的整体设计，则考虑的是不仅要**实时传输数据**，而且需要下**游有大量不同的业务应用，去消费实时产生的日志文件**。并且，这些数据处理也不是非常重要的金融交易，而是对于大量数据的实时分析，然后反馈到线上
 
-   > kafka后面幂等性，事务，exactly once能否支撑金融交易？
+   > kafka后面幂等性、事务，exactly once能否支撑金融交易？
    
 ## 2.架构
 
@@ -85,7 +85,7 @@ Kafka还没有成熟的时候，把数据分成批处理层和实时处理层是
 
 从以下几个方面来看它的实现： 
 - 数据分区分配策略 
-- meta更新策略 
+- metadata更新策略
 - RecordAccumulator的实现，即内存管理和分配 
 - 网络层
 
@@ -177,7 +177,6 @@ RecordAccumulator主要用来缓存消息以便Sender线程可以批量发送，
 ```
 
 那什么条件可以发送数据？
-
 ```Java
 // Sender.java
 private long sendProducerData(long now) {
@@ -787,7 +786,7 @@ ControllerEventThread启动之后会从ControllerEventManager里面的queue拉�
 ![controller处理event](../images/controller处理event.png)
 
 Startup匹配到了processStartup(),zk注册带了controllerChangeHandler，也就是说，响应回来就会调用controllerChangeHandler
-```Scala
+```Scala 
   private def processStartup(): Unit = {
     zkClient.registerZNodeChangeHandlerAndCheckExistence(controllerChangeHandler)
     elect()
@@ -1246,9 +1245,9 @@ MetadataCache
 ## 3.5 Consumer
 
 - coordinator
-- kafka是如何分配GroupConndinator， 如果GroupConndinator承载的broker挂了，咋么办
+- kafka是如何分配GroupConndinator，如果GroupConndinator承载的broker挂了，咋么办
 - 需要leader来分配分区
-- 分配策略*
+- 分配策略
 - offset是如何持久化的
 - 消费的时候，同步，异步，性能优化(IOthreads-workerthread)的如何做的
 

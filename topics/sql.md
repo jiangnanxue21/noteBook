@@ -167,9 +167,9 @@ InnoDB 的一个整数字段索引为例，这个 N 差不多是 1200。这棵�
 
 回表的问题，如何解决？
 
+需要执行几次树的搜索操作，会扫描多少行？
 ```SQL
-// 需要执行几次树的搜索操作，会扫描多少行？
-mysql> select * from T where k between 3 and 5
+select * from T where k between 3 and 5;
 ```
 在这个过程中，回到主键索引树搜索的过程，我们称为回表。这个查询过程读了k索引树的3条记录，回表了两次
 
@@ -193,8 +193,8 @@ mysql> select * from T where k between 3 and 5
 
 不符合最左前缀的部分，会怎么样呢？模糊查询阻断了age索引的使用
 
+以市民表的联合索引（name, age）为例
 ```SQL
-// 以市民表的联合索引（name, age）为例
 mysql> select * from tuser where name like '张%' and age=10 and ismale=1;
 ```
 
@@ -449,27 +449,27 @@ select * from t1 straight_join t2 on (t1.a=t2.a);
 3. 四大核心对象：Executor | StatementHandler | ParameterHandler | ResultSetHandler
 4. 三大解析器：XMLConfigBuilder | XMLMapperBuilder | XMLStatementBuilder
 5. 两级缓存 + 延迟加载 + 插件拦截链
-6. 动态 SQL 四件套：if / choose / trim / foreach
+6. 动态SQL四件套：if/choose/trim/foreach
 7. 日志 + 事务 + 连接池全部委托给DataSource
 8. Spring集成后：Mapper扫描 → FactoryBean → 代理 → SqlSessionTemplate（线程安全）
 
 ### 二、配置精要（必须手写三遍）
-1. environments → dataSource 类型：UNPOOLED / POOLED / JNDI
+1. environments → dataSource 类型：UNPOOLED/POOLED/JNDI
 2. settings 高频项：
     - cacheEnabled
     - lazyLoadingEnabled
     - multipleResultSetsEnabled
     - useGeneratedKeys
-    - defaultExecutorType：SIMPLE（默认）/ REUSE / BATCH
-    - mapUnderscoreToCamelCase：true 即可省掉 90% 的 resultMap
+    - defaultExecutorType：SIMPLE（默认）/REUSE/BATCH
+    - mapUnderscoreToCamelCase：true即可省掉90%的resultMap
 3. typeAliases + typeHandlers：
     - 枚举通用 EnumTypeHandler
     - JSON 字段用 JsonTypeHandler（自定义）
-4. mappers 四种注册方式：resource / url / class / package；Spring 启动用 @MapperScan 批量扫描
+4. mappers四种注册方式：resource / url / class / package；Spring启动用 @MapperScan 批量扫描
 5. 数据库方言：分页靠PageHelper（物理分页 = 拦截器 + ThreadLocal保存Page对象）
 
-### 三、映射三兄弟（resultType / resultMap / sql 片段）
-1. resultType 场景：列名 = 属性名或已开启驼峰
+### 三、映射三兄弟（resultType / resultMap / sql片段）
+1. resultType场景：列名 = 属性名或已开启驼峰
 2. resultMap必填场景：
     - 列名 ≠ 属性名
     - 一对一级联
@@ -477,13 +477,13 @@ select * from t1 straight_join t2 on (t1.a=t2.a);
     - 构造器注入
     - 枚举/JSON 字段
 3. 级联策略：
-    - association（1:1）嵌套 select 会 N+1，推荐嵌套resultMap一次join取出
-    - collection（1:N）用 ofType 指定泛型；分页场景一定加 “嵌套 resultMap + 分页子查询”，防止内存爆炸
+    - association（1:1）嵌套select会N+1，推荐嵌套resultMap一次join取出
+    - collection（1:N）用ofType指定泛型；分页场景一定加“嵌套resultMap + 分页子查询”，防止内存爆炸
 4. 鉴别器：discriminator实现单表多态（例如：Payment→Alipay/WxPay子类）
-5. 可重用 sql 片段：&lt;sql id="cols"&gt;…&lt;/sql&gt; + &lt;include refid="cols"/&gt;
+5. 可重用sql片段：&lt;sql id="cols"&gt;…&lt;/sql&gt; + &lt;include refid="cols"/&gt;
 
 ### 四、动态SQL {id="sql_1"}
-1. if test 里OGNL可以直接调用静态方法：@com.xxx.TypeEnum@isValid(val)
+1. if test里OGNL可以直接调用静态方法：@com.xxx.TypeEnum@isValid(val)
 2. choose/when/otherwise = switch…case
 3. trim前缀后缀：prefix / suffix / prefixOverrides / suffixOverrides
     - 万能where：&lt;trim prefix="where" prefixOverrides="and |or "&gt;
@@ -492,45 +492,45 @@ select * from t1 straight_join t2 on (t1.a=t2.a);
 5. script 注解：@Select("&lt;script&gt;…&lt;/script&gt;")，写在 Mapper 接口里，省XML
 
 ### 五、# 与 $ 安全底线
-1. #{} → PreparedStatement 占位符 → 防 SQL 注入
+1. #{} → PreparedStatement占位符 → 防SQL注入
 2. ${} → 字符串拼接 → 只能用于列名、排序字段、表名；前端传参必须白名单校验
 
 ### 六、缓存
-1. 一级缓存：SqlSession级，默认开启，commit / close / flush 即失效；  
+1. 一级缓存：SqlSession级，默认开启，commit/close/flush 即失效；  
    同线程连续查询可命中，但分布式场景下会读到脏数据 → 建议更新操作后 sqlSession.clearCache()
-2. 二级缓存：namespace 级，要求：&lt;cache/&gt; 标签 + 实体类可序列化；  
+2. 二级缓存：namespace级，要求：&lt;cache/&gt; 标签 + 实体类可序列化；  
    缓存失效策略：flushCache=true（语句级强制清空）、useCache=false（禁用二级）
-3. 分布式必关二级缓存，或者换 Redis + 自定义 Cache，版本号/广播失效
+3. 分布式必关二级缓存，或者换Redis+自定义Cache，版本号/广播失效
 
 ### 七、延迟加载（打破 N+1）
-1. settings 开 lazyLoadingEnabled + aggressiveLazyLoading=false
+1. settings开lazyLoadingEnabled + aggressiveLazyLoading=false
 2. 触发方式：调用getter时才发SQL
-   原理：Javassist 代理实体，拦截 getter → 通过 MetaObject 再查库
+   原理Javassist代理实体，拦截getter → 通过MetaObject再查库
 3. 陷阱：
     - 事务已关闭会报 LazyInitializationException
     - 在 Spring 中必须在 Service 层事务内访问
 
 ### 八、插件 / 拦截器（万能改写）
 1. 签名：@Intercepts({@Signature(type=Executor.class, method="query", args=…)})
-2. 典型场景：分页、多租户字段自动拼接、读写分离、慢 SQL 统计
+2. 典型场景：分页、多租户字段自动拼接、读写分离、慢SQL统计
 3. 责任链顺序：插件 → ParameterHandler → StatementHandler → ResultSetHandler → Executor
 4. 实现步骤：实现 Interceptor → 在 mybatis-config 或 Spring 注入插件 Bean
 5. PageHelper 就是基于 Executor.query 拦截器做的
 
 ### 九、批量与事务
-1. ExecutorType.BATCH：  
+1. ExecutorType.BATCH：
    SqlSession session = sqlSessionFactory.openSession(ExecutorType.BATCH, false);  
-   每 1000 条 flushStatements() 一次，最后 commit
+   每1000条 flushStatements() 一次，最后commit
 2. Spring 集成：@Transactional + SqlSessionTemplate 无法切换 BATCH，  
    需要手工注入 SqlSessionFactory，在 Service 内部 openSession(BATCH)
 3. 返回主键：useGeneratedKeys=true keyProperty="id" 批量插入后，参数对象里 id 会被回填（MySQL 支持）
 
 ### 十、常见异常与排查
-1. BindingException：接口与 XML 不对应 → 检查 namespace / 方法名 / 参数
+1. BindingException：接口与XML不对应 → 检查namespace / 方法名 / 参数
 2. TooManyResultsException：期望一条返回多条 → 换 selectOne 或 limit 1
-3. N+1：日志里瞬间多出成百上千 SQL → association 嵌套 select 导致，改为 join
+3. N+1：日志里瞬间多出成百上千 SQL → association嵌套select 导致，改为join
 4. 缓存脏读：线上更新后查询仍旧值 → 二级缓存未失效，关或加版本
-5. 分页总数不对：PageHelper 必须紧挨 Mapper 查询语句，中间不能有任何查询
+5. 分页总数不对：PageHelper必须紧挨Mapper查询语句，中间不能有任何查询
 
 ### BaseExecutor
 
@@ -550,7 +550,6 @@ BaseExecutor是模板方法，子类只要实现四个基本方法doUpdate，doF
   }
 
   output:
-
     DEBUG [main] - Opening JDBC Connection
     DEBUG [main] - Setting autocommit to false on JDBC Connection [org.apache.derby.impl.jdbc.EmbedConnection@1590481849 (XID = 1140), (SESSIONID = 5), (DATABASE = ibderby), (DRDAID = null) ]
     DEBUG [main] - ==>  Preparing: SELECT * FROM author WHERE id = ?
@@ -571,16 +570,13 @@ DEBUG [main] - <==      Total: 0
 DEBUG [main] - ==> Parameters: -1(Integer)
 DEBUG [main] - <==      Total: 0
 
-
 # 3. BatchExecutor 大量的修改操作, 查询操作和simple没有区别
     BatchExecutor executor = new BatchExecutor(config, new JdbcTransaction(ds, null, false));
-
 ```
 
 #### 一级缓存
 
 一级缓存和获取连接在公共部分，所有放在BaseExecutor
-
 ```
  try (SqlSession sqlSession1 = sqlSessionFactory.openSession()) {
       PersonMapper pm = sqlSession1.getMapper(PersonMapper.class);
@@ -668,7 +664,7 @@ sequenceDiagram
     SH-->>App: 结束
 ```
 
-在executor里面
+在executor里面调用
 ```Java
   @Override
   public <E> List<E> doQuery(MappedStatement ms, Object parameter, RowBounds rowBounds, ResultHandler resultHandler,
@@ -686,7 +682,7 @@ sequenceDiagram
   }
 ```
 
-为什么要用configuration去创建StatementHandler
+为什么要用configuration去创建StatementHandler？
 1. 统一
 2. 插件拦截
 
@@ -705,7 +701,6 @@ sequenceDiagram
 ```
 
 BaseStatementHandler是用来处理一些共性的事件
-
 ```Java
   @Override
   public Statement prepare(Connection connection, Integer transactionTimeout) throws SQLException {
@@ -730,6 +725,7 @@ BaseStatementHandler是用来处理一些共性的事件
 
 ![ResultHandler.png](../images/ResultHandler.png)
 
+ResultHandler的例子：
 ```Java
   void resultHandlerTest() {
     try (SqlSession sqlSession = sqlSessionFactory.openSession()) {
@@ -745,6 +741,382 @@ BaseStatementHandler是用来处理一些共性的事件
     }
 }
 ```
+
+代码流程图：
+
+
+
+### 映射体系
+
+```Mermaid
+graph TD
+A[反射模块]
+A -->|14| B[Reflector和ReflectorFactory]
+B --> B1[提供对象的元数据访问,缓存]
+A -->|37| C[TypeParameterResolver]
+C --> C1[对上面Reflector的增强]
+A -->|1| D[ObjectFactory]
+D --> D1[创建对象]
+A -->|11| E[Property]
+E --> E1[复杂属性的支持，特别是特殊的表达式，而Reflector处理的会比较简单]
+A -->|1| F[MetaClass]
+F --> F1[Reflector和ReflectorFactory的组合使用，实现复杂属性表达式的解析]
+A -->|1| G[ObjectWrapper]
+G --> G1[对一个对象进行了封装，方便通过这个类来对对象进行属性的设置以及读取属性
+然后根据被封装对象的类型，分别使用不同的子类来进行封装]
+A -->|1| H[MetaObject]
+H --> H1[完成属性表达式的解析操作]
+```
+
+#### 可能会被问到的问题
+
+- MyBatis中反射模块的作用是什么？
+
+  在进行**参数处理**、**结果集映射**等操作时会使用到大量的反射操作，Java中的反射功能虽然强大，但是代码编写起来比较复杂且容易出错，为了简化反射操作的相关代码，MyBatis提供了专门的反射模块，该模块位于org.apache.ibatis.reflection包下，它对常见的反射操作做了进一步的封装，提供了更加简洁方便的反射API。
+
+  **ParameterHandler**：在处理预编译语句（PreparedStatement）时，ParameterHandler负责将Java对象的属性值设置到SQL语句的参数中。它使用MetaObject来动态获取对象的属性值。
+
+  **ResultSetHandler**：当从数据库查询结果集（ResultSet）中读取数据并映射到Java对象时，ResultSetHandler使用MetaObject来动态设置对象的属性值。
+
+- Reflector和ReflectorFactory类的功能是什么？
+
+  Reflector类封装了Java反射API，提供了获取和设置对象属性的方法。ReflectorFactory类用于创建和管理Reflector实例，通过缓存机制提高性能
+
+- 如何使用TypeParameterResolver来解析泛型参数？
+
+  解析字段，方法返回值和方法参数的类型
+
+- ObjectFactory在MyBatis中扮演什么角色？
+
+  这个需要看了结果映射和参数映射才行
+
+- MetaClass类如何提供对JavaBean类的元数据访问？
+
+  MetaClass通常与MetaObject一起使用，MetaObject是对单个对象的封装，而MetaClass是对类的封装。
+  MetaObject使用MetaClass来获取类的元数据，从而可以动态地访问和修改对象的属性
+
+  如下面的笔记，MetaClass其实用到了Reflector，去获取了Class的类和方法，由于ReflectorFactory可以设置缓存，所以只需要初始化一次就行
+
+- ObjectWrapper接口如何帮助处理不同类型的对象包装？
+- MetaObject类如何提供对对象属性的动态访问？
+- 如何自定义ObjectFactory或ObjectWrapper以扩展MyBatis的反射功能？
+
+#### Reflector
+
+Reflector是反射模块的基础，每个Reflector对象都对应一个类，在Reflector中缓存了反射需要使用的类的元信息
+
+在Reflector的构造器中会完成相关的属性的初始化操作
+
+```java
+  // 解析指定的Class类型 并填充上述的集合信息
+  public Reflector(Class<?> clazz) {
+    type = clazz; // 初始化 type字段
+    addDefaultConstructor(clazz);// 设置默认的构造方法
+    addGetMethods(clazz);// 获取getter方法
+    addSetMethods(clazz); // 获取setter方法
+    addFields(clazz); // 处理没有getter/setter方法的字段
+    // 初始化 可读属性名称集合
+    readablePropertyNames = getMethods.keySet().toArray(new String[0]);
+    // 初始化 可写属性名称集合
+    writablePropertyNames = setMethods.keySet().toArray(new String[0]);
+    // caseInsensitivePropertyMap记录了所有的可读和可写属性的名称 也就是记录了所有的属性名称
+    for (String propName : readablePropertyNames) {
+      // 属性名称转大写
+      caseInsensitivePropertyMap.put(propName.toUpperCase(Locale.ENGLISH), propName);
+    }
+    for (String propName : writablePropertyNames) {
+      // 属性名称转大写
+      caseInsensitivePropertyMap.put(propName.toUpperCase(Locale.ENGLISH), propName);
+    }
+  }
+```
+
+ReflectorFactory接口主要实现了对Reflector对象的创建和**缓存**。
+
+接口的定义如下,该接口提供了DefaultReflectorFactory这一个实现类
+
+```java
+public interface ReflectorFactory {
+    
+  // 检测该ReflectorFactory是否缓存了Reflector对象
+  boolean isClassCacheEnabled();
+  
+  // 设置是否缓存Reflector对象
+  void setClassCacheEnabled(boolean classCacheEnabled);
+  
+  // 创建指定了Class的Reflector对象
+  Reflector findForClass(Class<?> type);
+}
+```
+
+```java
+public class DefaultReflectorFactory implements ReflectorFactory {
+  private boolean classCacheEnabled = true;
+  // 实现对 Reflector 对象的缓存
+  private final ConcurrentMap<Class<?>, Reflector> reflectorMap = new ConcurrentHashMap<>();
+
+  public DefaultReflectorFactory() {
+  }
+
+  @Override
+  public boolean isClassCacheEnabled() {
+    return classCacheEnabled;
+  }
+
+  @Override
+  public void setClassCacheEnabled(boolean classCacheEnabled) {
+    this.classCacheEnabled = classCacheEnabled;
+  }
+
+  @Override
+  public Reflector findForClass(Class<?> type) {
+    if (classCacheEnabled) {// 开启缓存
+      // synchronized (type) removed see issue #461
+      return reflectorMap.computeIfAbsent(type, Reflector::new);
+    } else {
+      // 没有开启缓存就直接创建
+      return new Reflector(type);
+    }
+  }
+}
+```
+
+针对于Class中Field和Method的调用，在MyBatis中封装了Invoker对象来统一处理
+
+```java
+public interface Invoker {
+  // 执行Field或者Method
+  Object invoke(Object target, Object[] args) throws IllegalAccessException, InvocationTargetException;
+
+  // 返回属性相应的类型
+  Class<?> getType();
+}
+```
+
+![invoke.png](../images/invoke.png)
+
+样例
+```Java
+  @Test
+  void test() throws InvocationTargetException, InstantiationException, IllegalAccessException {
+    Reflector reflector= new Reflector(RichType.class);
+    
+    // class org.apache.ibatis.domain.misc.RichType
+    System.out.println(reflector.getType());
+    String[] gettable = reflector.getGetablePropertyNames();
+    // [richType, richProperty, richMap, richList, richField]
+    System.out.println(Arrays.toString(gettable));
+
+    Reflector reflector2 = new DefaultReflectorFactory().findForClass(RichType.class);
+    Object o = reflector2.getDefaultConstructor().newInstance();
+    Invoker richPropertySetter = reflector2.getSetInvoker("richProperty");
+    richPropertySetter.invoke(o, new String[]{"666"});
+    Invoker richPropertyGetter = reflector2.getGetInvoker("richProperty");
+    Object res = richPropertyGetter.invoke(o, null);
+    System.out.println(res);
+  }
+```
+
+![reflector解析.png](../images/reflector解析.png)
+
+#### MetaClass
+
+在Reflector中可以针对普通的属性操作，但是如果出现了比较复杂的属性，比如 private Person person; 
+要查找的表达式person.userName.针对这种表达式的处理，这时就可以通过MetaClass来处理了
+
+```java
+/**
+ * 通过 Reflector 和 ReflectorFactory 的组合使用 实现对复杂的属性表达式的解析
+ * @author Clinton Begin
+ */
+public class MetaClass {
+  // 缓存 Reflector
+  private final ReflectorFactory reflectorFactory;
+  // 创建 MetaClass时 会指定一个Class reflector会记录该类的相关信息
+  private final Reflector reflector;
+
+  private MetaClass(Class<?> type, ReflectorFactory reflectorFactory) {
+    this.reflectorFactory = reflectorFactory;
+    this.reflector = reflectorFactory.findForClass(type);
+  }
+  // ....
+}
+```
+
+#### MetaObject
+
+```Java
+public class MetaObject {
+
+    private final Object originalObject;
+    private final ObjectWrapper objectWrapper;
+    private final ObjectFactory objectFactory;
+    private final ObjectWrapperFactory objectWrapperFactory;
+    private final ReflectorFactory reflectorFactory;
+
+    private MetaObject(Object object, ObjectFactory objectFactory, ObjectWrapperFactory objectWrapperFactory,
+                       ReflectorFactory reflectorFactory) {
+        this.originalObject = object;
+        this.objectFactory = objectFactory;
+        this.objectWrapperFactory = objectWrapperFactory;
+        this.reflectorFactory = reflectorFactory;
+
+        if (object instanceof ObjectWrapper) {
+            this.objectWrapper = (ObjectWrapper) object;
+        } else if (objectWrapperFactory.hasWrapperFor(object)) {
+            this.objectWrapper = objectWrapperFactory.getWrapperFor(this, object);
+        } else if (object instanceof Map) {
+            this.objectWrapper = new MapWrapper(this, (Map) object);
+        } else if (object instanceof Collection) {
+            this.objectWrapper = new CollectionWrapper(this, (Collection) object);
+        } else {
+            this.objectWrapper = new BeanWrapper(this, object);
+        }
+    }
+}
+```
+
+| 序号 | 问题                               | 得分关键词                                                                                                             |
+|----|----------------------------------|-------------------------------------------------------------------------------------------------------------------|
+| 1  | MetaObject到底是什么？跟反射有什么区别？        | “封装反射”“缓存元数据”“读写属性统一入口”“性能比原生反射高”                                                                                 |
+| 2  | 创建MetaObject的入口代码长什么样？           | `SystemMetaObject.forObject(obj)`、`MetaObject.forObject(...,objectFactory,objectWrapperFactory,reflectorFactory)` |
+| 3  | MetaObject 的四大核心属性？              | `originalObject`、`objectWrapper`、`objectFactory`、`objectWrapperFactory`                                           |
+| 4  | 取值/赋值的核心方法？                      | `getValue(String property)`、`setValue(String property,Object value)`、“支持OGNL语法”                                   |
+| 5  | 支持哪些“复杂”路径？举3个例子。                | `order.user.name`、`list[0].price`、`map['key'].id`                                                                 |
+| 6  | 如果属性是Collection，MetaObject怎么帮我创建元素？ | “自动new对象” “ObjectFactory创建空参实例” “先set再添加到集合”                                                                      |
+| 7  | 性能为什么比反射快？                       | “Reflector缓存Class元数据” “MethodHandle或FastClass” “只解析一次OGNL”                                                        |
+| 8  | 在MyBatis源码里，哪些地方真正用到MetaObject？  | `ParameterHandler#setParameters`、`ResultSetHandler#applyAutomaticMappings`、`Executor#createCacheKey`              |
+
+```java
+  @Test
+  void shouldGetAndSetNestedListItem() {
+    RichType rich = new RichType();
+    MetaObject meta = SystemMetaObject.forObject(rich);
+    meta.setValue("richType.richList[0]", "foo");
+    assertEquals("foo", meta.getValue("richType.richList[0]"));
+  }
+```
+
+#### 手动映射
+
+resultMap对应的是xml的标签，是一个完整对象，里面装着
+- id、type、继承关系
+- 一组ResultMapping对象，下面例子中用来描述“哪一列 → 哪一属性”的单个标签，最终都会被解析成一个ResultMapping对象
+- 一组 一对一/一对多的嵌套ResultMap引用
+
+![手动映射2.png](../images/手动映射2.png)
+
+
+
+**association**
+
+在结果映射（resultMap）中用来处理“一对一”关联关系的标签。
+它把两张表中通过外键关联的记录，封装成Java对象里一个“复杂类型”的属性，从而一次性完成连表查询 → 对象组装的整个过程，避免手动再查一次数据库
+
+数据库
+```Text
+user(id, username, password, card_id)  
+idcard(id, code, address)
+```
+
+实体
+```Java
+@Data
+public class User {
+    private Integer id;
+    private String username;
+    private IdCard card;   // 一对一关联
+}
+
+@Data
+public class IdCard {
+    private Integer id;
+    private String code;
+    private String address;
+}
+```
+
+Mapper XML
+```XML
+<!-- 1. 连表查询 -->
+<select id="selectUserWithCard" resultMap="userCardMap">
+    SELECT u.id   AS uid,
+           u.username,
+           c.id   AS cid,
+           c.code,
+           c.address
+    FROM user u
+    LEFT JOIN idcard c ON u.card_id = c.id
+    WHERE u.id = #{id}
+</select>
+
+<!-- 2. 结果映射 -->
+<resultMap id="userCardMap" type="User">
+    <id property="id" column="uid"/>
+    <result property="username" column="username"/>
+    <!-- 一对一映射 -->
+    <association property="card" javaType="IdCard">
+        <id property="id" column="cid"/>
+        <result property="code" column="code"/>
+        <result property="address" column="address"/>
+    </association>
+</resultMap>
+```
+
+**Collection**
+
+在结果映射（resultMap）中处理“一对多”关联关系的标签。它把主表一条记录对应从表多条记录的场景，
+自动封装成Java对象里一个集合属性（List、Set等），一次性完成连表查询 → 对象组装，避免N+1次查询
+
+实体
+```Java
+@Data
+public class Dept {
+    private Integer id;
+    private String deptName;
+    private List<Emp> emps;   // 一对多
+}
+
+@Data
+public class Emp {
+    private Integer id;
+    private String empName;
+}
+```
+
+Mapper XML
+```XML
+<!-- 1. 连表查询 -->
+<select id="selectDeptWithEmps" resultMap="deptEmpMap">
+    SELECT d.id   AS did,
+           d.dept_name,
+           e.id   AS eid,
+           e.emp_name
+    FROM dept d
+    LEFT JOIN emp e ON e.dept_id = d.id
+    WHERE d.id = #{id}
+</select>
+
+<!-- 2. 结果映射 -->
+<resultMap id="deptEmpMap" type="Dept">
+    <id property="id" column="did"/>
+    <result property="deptName" column="dept_name"/>
+    <!-- 一对多映射 -->
+    <collection property="emps" ofType="Emp">
+        <id property="id" column="eid"/>
+        <result property="empName" column="emp_name"/>
+    </collection>
+</resultMap>
+```
+
+#### 自动映射
+
+自动映射条件：
+1. 列名和属性名同时存在（忽略大小写）
+2. 当前列未手动设置映射
+3. 属性类别存在 TypeHandler
+4. 开启autoMapping（默认开启）
+
 
 ### 动态SQL
 

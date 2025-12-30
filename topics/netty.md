@@ -1,5 +1,8 @@
 # Netty
 
+1. 阻塞是阻塞在哪里，非阻塞是非阻塞在哪里
+2. 为什么有channel 和 buffer两个概念
+
 分成以下几部分去总结：
 1. 网络基础
 2. 事件循环组
@@ -8,7 +11,7 @@
 
 ## 1. 网络基础
 
-![网络基础示意图.png](网络基础示意图.png)
+![网络基础示意图.png](../images/网络基础示意图.png)
 
 ### 网络IO变化，模型
 
@@ -29,13 +32,17 @@
 
 BIO的阻塞在哪里
 1. accept的时候就一直在等待着客户端的连接，这个等待过程中主线程就一直在阻塞
-2. 连接建立之后， clone thread的时候会系统调用，在读取到socket信息之前，线程也是一直在等待，一直处于阻塞的状态下
+2. 连接建立之后，clone thread的时候会系统调用，在读取到socket信息之前，线程也是一直在等待，一直处于阻塞的状态下
 
-![阻塞IO.png](阻塞IO.png)
+![阻塞IO.png](../images/阻塞IO.png)
 
 当客户端并发访问量增加后，服务端的线程个数和客户端并发访问数呈 1:1 的正比关系，线程数量快速膨胀后，系统的性能将急剧下降
 
 thread池化的问题：如果发生读取数据较慢时（比如数据量大、网络传输慢等），慢的连接会阻塞占用线程，而其他接入的消息，只能一直等待
+
+Tomcat的BIO
+
+![tomcat的BIO.png](../images/tomcat的BIO.png)
 
 - NIO
 1. JDK new IO
@@ -46,19 +53,22 @@ thread池化的问题：如果发生读取数据较慢时（比如数据量大�
 </p>
 
 ```Java
-LinkedList<SocketChannel> clients = new LinkedList<>();
-ServerSocketChannel ss = ServerSocketChannel.open(); // 服务端开启监听：接受客户端
-ss.bind(new InetSocketAddress(9090));
-ss.configureBlocking(false); // 重点: OS NONBLOCKING!!!, 只让接受客户端, 不阻塞
+public test() {
+   LinkedList<SocketChannel> clients = new LinkedList<>();
+   ServerSocketChannel ss = ServerSocketChannel.open(); // 服务端开启监听：接受客户端
+   ss.bind(new InetSocketAddress(9090));
+   ss.configureBlocking(false); // 重点: OS NONBLOCKING!!!, 只让接受客户端, 不阻塞
 
-while (true){
-// 接受客户端的连接
-SocketChannel client = ss.accept(); 
-  if(client ==null){
-        // 如果没有连接，直接返回null
-        }else{
-        // 读取数据流程
-        }
+   while (true) {
+       // 接受客户端的连接
+      SocketChannel client = ss.accept();
+      if(client ==null){
+         // 如果没有连接，直接返回null
+      }else{
+         // 读取数据流程
+      }
+   }
+}
 ```
 
 NIO慢在哪里：
@@ -95,15 +105,14 @@ select有fd大小的限制，而poll没有，FD_SETSIZE(1024)
 > 无论NIO,SELECT,POLL都是要遍历所有的IO，并且询问状态；
 > 只不过，NIO遍历的成本在用户态内核态切换，
 > 而SELECT,POLL只触发了一次系统调用，把需要的fds传递给内核，内核重新根据用户这次调用传过来的fds，遍历修改状态
-    
-    
+
 select的问题
 1. 每次都要重新传递fds
 2. 每次内核被调用之后，针对这次调用，触发一个遍历fds全量的复杂度
 
 - epoll
 
-![epoll.png](epoll.png)
+![epoll.png](../images/epoll.png)
 
 三个函数：
 1. epoll_create: 开辟一个红黑树空间
@@ -114,7 +123,7 @@ select的问题
 
 select, poll: O(n)
 
-epoll : O(1)
+epoll: O(1)
 
 #### Java示例
 ```Java
@@ -208,7 +217,7 @@ public class SocketMultiplexingSingleThreadv1 {
         }
     }
 
-    public void readHandler(SelectionKey key) {...}
+    public void readHandler(SelectionKey key) {}
 ```
 
 写事件处理：
@@ -220,6 +229,10 @@ send-queue(netstat -anp可以显示), 只要是空的，就一定会返回可以
 2. 第二步你才关心send-queue是否有空间
 3. 读 read 一开始就要注册，但是write依赖以上关系，用的时候注册
 4. 如果一开始就注册了write的事件，进入死循环，一直调起
+
+Tomcat的Reactor模型，属于“主从 Reactor 多线程”实现
+
+![tomcat的NIO模型.png](../images/tomcat的NIO模型.png)
 
 
 ## 1. PageCache
@@ -265,7 +278,7 @@ Kafka 里面会有两种常见的海量数据传输的情况。一种是从网�
 
 也叫做分发者模式或通知者模式，是一种将就绪事件派发给对应服务处理程序的事件设计模式
 
-![netty架构.png](netty架构.png)
+![netty架构.png](../images/netty架构.png)
 
 Netty is an **asynchronous event-driven** network application framework
 for rapid development of **maintainable high performance protocol** servers & clients.
@@ -281,13 +294,12 @@ for rapid development of **maintainable high performance protocol** servers & cl
 #### 抽象类描述
 
 InputStream流程如下：
-
-1. read(byte b[]) 直接调用read(byte b[], int off, int len)函数
+1. read(byte b[]) 直接调用read(byte b[], int off, int len)函数，每次调用read()都可能触发系统调用，开销大
 2. 校验byte数组是否为空
 3. 校验读取范围是否正确
 4. 校验读取长度
 5. 调用read()函数读入一个字节
-6.  验证字节是否到达了文件的末尾
+6. 验证字节是否到达了文件的末尾
 7. 将该字节数据保存到b数组中
 8. 循环将文件的数据，逐字节的从磁盘中读入放入b字节数组中
 
@@ -399,7 +411,7 @@ jint readBytes(JNIEnv *env, jobject this, jbyteArray bytes,
 1. 在JVM内存中分配的空间为：直接内存缓冲区（DirectByteBuffer）
 2. 在JVM内存中的堆内存中开辟的空间为：堆内存缓冲区（HeapByteBuffer），操作系统想和JVM沟通，先从堆内存放到DirectByteBuffer，再拷贝到OS内存
 
-![直接内存与堆内存原理.png](直接内存与堆内存原理.png)
+![直接内存与堆内存原理.png](../images/直接内存与堆内存原理.png)
 
 零拷贝：指的是在JVM内存这个上下文中，直接从DirectBuffer里面读/写，避免拷贝到堆内内存
 
@@ -491,7 +503,7 @@ class DirectByteBuffer extends MappedByteBuffer implements DirectBuffer{
 </p>
 
 ### 事件循环组
-![事件循环组模型.png](事件循环组模型.png)
+![事件循环组模型.png](../images/事件循环组模型.png)
 
 #### 如何异步执行？Promise
 
@@ -519,9 +531,8 @@ Netty使用了观察者模式，当执行任务完成时，自动在执行线程
             }
         }
     };
-    .....
     
-        private boolean setValue0(Object objResult) {
+    private boolean setValue0(Object objResult) {
         if (RESULT_UPDATER.compareAndSet(this, null, objResult) ||
                 RESULT_UPDATER.compareAndSet(this, UNCANCELLABLE, objResult)) {
             if (checkNotifyWaiters()) {
@@ -536,21 +547,22 @@ Netty使用了观察者模式，当执行任务完成时，自动在执行线程
 promise的两种用法，一种是直接包装返回
 ```Java
  final ChannelFuture initAndRegister() {
-        Channel channel = null;
-        try {
-            channel = channelFactory.newChannel();
-            init(channel);
-        } catch (Throwable t) {
-            if (channel != null) {
-                // channel can be null if newChannel crashed (eg SocketException("too many open files"))
-                channel.unsafe().closeForcibly();
-                // as the Channel is not registered yet we need to force the usage of the GlobalEventExecutor
-                return new DefaultChannelPromise(channel, GlobalEventExecutor.INSTANCE).setFailure(t);
-            }
+    Channel channel = null;
+    try {
+        channel = channelFactory.newChannel();
+        init(channel);
+    } catch (Throwable t) {
+        if (channel != null) {
+            // channel can be null if newChannel crashed (eg SocketException("too many open files"))
+            channel.unsafe().closeForcibly();
             // as the Channel is not registered yet we need to force the usage of the GlobalEventExecutor
-            // 直接包装返回
-            return new DefaultChannelPromise(new FailedChannel(), GlobalEventExecutor.INSTANCE).setFailure(t);
+            return new DefaultChannelPromise(channel, GlobalEventExecutor.INSTANCE).setFailure(t);
         }
+        // as the Channel is not registered yet we need to force the usage of the GlobalEventExecutor
+        // 直接包装返回
+        return new DefaultChannelPromise(new FailedChannel(), GlobalEventExecutor.INSTANCE).setFailure(t);
+    }
+}
 ```
 
 一种是和runnable组合
@@ -565,6 +577,8 @@ promise的两种用法，一种是直接包装返回
                         register0(promise);
                     }
                 });
+                
+                
 ```
 
 ### 事件循环组
@@ -574,17 +588,18 @@ promise的两种用法，一种是直接包装返回
 
 事件循环组集成图
 
-![事件循环组.png](事件循环组.png)
+![事件循环组.png](../images/事件循环组.png)
 
 ```Java
 // EventExecutor继承EventExecutorGroup，是一个特殊的组，next指向他自己
 public interface EventExecutor extends EventExecutorGroup {
-   /**
+    /**
      * Returns a reference to itself.
      * 永远指向自己
      */
-   @Override
+    @Override
     EventExecutor next();
+}
 ```
 
 EventExecutorGroup组里面有多个线程，通过next函数返回**一个(one of the EventExecutor)**，具有调度功能
@@ -611,8 +626,9 @@ public interface EventLoopGroup extends EventExecutorGroup {
      */
     @Override
     EventLoop next();
-    
-   ChannelFuture register(Channel channel);
+
+    ChannelFuture register(Channel channel);
+}
 ```
 
 EventLoop是一个标志接口，代表了EventLoopGroup的一个EventLoop
@@ -632,10 +648,10 @@ public abstract class MultithreadEventExecutorGroup extends AbstractEventExecuto
     private final Set<EventExecutor> readonlyChildren;
     private final AtomicInteger terminatedChildren = new AtomicInteger();
     private final Promise<?> terminationFuture = new DefaultPromise(GlobalEventExecutor.INSTANCE);
-    
+
     // chooser选择children里面的EventExecutor
     private final EventExecutorChooserFactory.EventExecutorChooser chooser;
-    
+
     @Override
     public EventExecutor next() {
         return chooser.next();
@@ -646,22 +662,25 @@ public abstract class MultithreadEventExecutorGroup extends AbstractEventExecuto
 // threadFactory：线程的构造方法
 // chooserFactory：选择器
 
-protected MultithreadEventExecutorGroup(int nThreads, Executor executor,
-                                        EventExecutorChooserFactory chooserFactory, Object... args) {
-    checkPositive(nThreads, "nThreads");
+    protected MultithreadEventExecutorGroup(int nThreads, Executor executor,
+                                            EventExecutorChooserFactory chooserFactory, Object... args) {
+        checkPositive(nThreads, "nThreads");
 
-    if (executor == null) {
-        executor = new ThreadPerTaskExecutor(newDefaultThreadFactory());
-    }
-
-    children = new EventExecutor[nThreads];
-
-    for (int i = 0; i < nThreads; i++) {
-        boolean success = false;
-        try {
-            children[i] = newChild(executor, args);
-            success = true;
+        if (executor == null) {
+            executor = new ThreadPerTaskExecutor(newDefaultThreadFactory());
         }
+
+        children = new EventExecutor[nThreads];
+
+        for (int i = 0; i < nThreads; i++) {
+            boolean success = false;
+            try {
+                children[i] = newChild(executor, args);
+                success = true;
+            }
+        }
+    }
+}
 ```
 
 线程是如何构造的，很简单，直接new一个Thread
@@ -677,11 +696,12 @@ public final class ThreadPerTaskExecutor implements Executor {
     public void execute(Runnable command) {
         threadFactory.newThread(command).start();
     }
+}
 ```
 
 children数组包含的是EventExecutor的类型，由子类去实现；NioEventLoopGroup的实现里面，children存放的是NioEventLoop
 ```Java
-`@Override
+@Override
 protected EventLoop newChild(Executor executor, Object... args) throws Exception {
     SelectorProvider selectorProvider = (SelectorProvider) args[0];
     SelectStrategyFactory selectStrategyFactory = (SelectStrategyFactory) args[1];
@@ -699,24 +719,24 @@ protected EventLoop newChild(Executor executor, Object... args) throws Exception
     return new NioEventLoop(this, executor, selectorProvider,
             selectStrategyFactory.newSelectStrategy(),
             rejectedExecutionHandler, taskQueueFactory, tailTaskQueueFactory);
-}`
+}
 ```
 
 Chooser的实现: DefaultEventExecutorChooserFactory.INSTANCE
 ```Java
-`public EventExecutorChooser newChooser(EventExecutor[] executors) {
+public EventExecutorChooser newChooser(EventExecutor[] executors) {
     if (isPowerOfTwo(executors.length)) {
         return new PowerOfTwoEventExecutorChooser(executors);
     } else {
         return new GenericEventExecutorChooser(executors);
     }
-}`
+}
 ```
 对于2的指数使用PowerOfTwoEventExecutorChooser，否则直接取模操作
 ```Java
-`public EventExecutor next() {
+public EventExecutor next() {
     return executors[idx.getAndIncrement() & executors.length - 1];
-}`
+}
 ```
 
 Netty主方法的解释：
@@ -771,38 +791,41 @@ public static void main(String[] args) throws Exception {
 bind方法下：
 ```Java
     final ChannelFuture initAndRegister() {
-        Channel channel = null;
-        try {
-            channel = channelFactory.newChannel();
-            init(channel);
-            
+    Channel channel = null;
+    try {
+        channel = channelFactory.newChannel();
+        init(channel);
+
 // ServerBootstrap.java
-@Override
-void init(Channel channel) {
- 
-
-    ChannelPipeline p = channel.pipeline();
-    
-// todo 这个不是主线程执行的?
-    p.addLast(new ChannelInitializer<Channel>() {
         @Override
-        public void initChannel(final Channel ch) {
-            final ChannelPipeline pipeline = ch.pipeline();
-            ChannelHandler handler = config.handler();
-            if (handler != null) {
-                pipeline.addLast(handler);
-            }
+        void init (Channel channel){
 
-            ch.eventLoop().execute(new Runnable() {
+
+            ChannelPipeline p = channel.pipeline();
+
+// todo 这个不是主线程执行的?
+            p.addLast(new ChannelInitializer<Channel>() {
                 @Override
-                public void run() {
-                    pipeline.addLast(new ServerBootstrapAcceptor(
-                            ch, currentChildGroup, currentChildHandler, currentChildOptions, currentChildAttrs,
-                            extensions));
+                public void initChannel(final Channel ch) {
+                    final ChannelPipeline pipeline = ch.pipeline();
+                    ChannelHandler handler = config.handler();
+                    if (handler != null) {
+                        pipeline.addLast(handler);
+                    }
+
+                    ch.eventLoop().execute(new Runnable() {
+                        @Override
+                        public void run() {
+                            pipeline.addLast(new ServerBootstrapAcceptor(
+                                    ch, currentChildGroup, currentChildHandler, currentChildOptions, currentChildAttrs,
+                                    extensions));
+                        }
+                    });
                 }
             });
         }
-    });
+    }
+}
 ```
 上面只是添加了ChannelInitializer，那真正是在哪里展开的呢？
 
@@ -842,12 +865,11 @@ AbstractChannel.java
 内存分配的问题：
 1. 内碎片
 
-    ![内碎片.png](内碎片.png)
+    ![内碎片.png](../images/内碎片.png)
 
 2. 外碎片
 
-    ![外碎片.png](外碎片.png)
-
+    ![外碎片.png](../images/外碎片.png)
 
 ### 粘包和半包
 
